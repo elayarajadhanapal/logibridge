@@ -1,0 +1,16 @@
+Component B — Hardware Selection and Justification
+Task B1 — Constraint Triangle Application The dominant constraints for this cold-chain deployment are the strict 10W AI power budget (drawn from the truck's 12V supply) and the software ecosystem requirement to support Docker containerisation and a Python-based MLOps pipeline. 
+	Option 1: Raspberry Pi 5 + Hailo-8L: (Selected). This is the only viable option. It operates within the power budget at 7.5W, provides a full Linux environment to run the mandated Docker and Python stacks, and at ₹15,000/truck, it scales economically to the full 265-vehicle fleet. 
+	Option 2: Jetson Orin Nano: (Rejected). Operating at 15W, this board fails the hard 10W power constraint. At ₹45,000 per unit, it is over-provisioned and financially inefficient for simple MLP inference. 
+	Option 3: STM32H7 MCU: (Rejected). While highly cost-effective (₹3,500) and power-efficient (0.4W), a microcontroller cannot run the required Docker containers, Ansible playbooks, or standard Python 3.11 ecosystem defined in the project scope. 
+Task B2 — Arithmetic Intensity and Roofline Analysis
+	Hardware Specifications: The Raspberry Pi 5 CPU has a peak compute (π) of 16 GFLOP/s and a peak memory bandwidth (β) of 12 GB/s. 
+	Model Profile: The trained model requires 45 MFLOPs and accesses 18 MB of data per inference. 
+	Arithmetic Intensity (AI) Calculation: 45 MFLOPs / 18 MB = 2.5 FLOPs/Byte.
+	Hardware Ridge Point Calculation: 16 GFLOP/s / 12 GB/s = 1.33 FLOPs/Byte.
+	Analysis & Optimisation: Because the model's Arithmetic Intensity (2.5) is strictly greater than the hardware Ridge Point (1.33), the inference is Compute-Bound. To improve the 90-second SLA latency, optimizations must focus on reducing the mathematical operations. Appropriate techniques include Post-Training Quantisation (INT8) or Structured Pruning. 
+To justify the choice effectively, you must show how two options completely break one or more of these vertices, leaving only one survivor.
+	The Power Vertex (Breaking the Jetson): The project explicitly states a hard 10W AI power budget drawn from the truck's 12V supply. The Jetson Orin Nano draws 15W under moderate load. It physically fails the power constraint of the truck's electrical setup. It also fails the Cost vertex for fleet scaling (₹45,000 × 265 trucks = over ₹1.19 Crore for edge nodes alone).
+	The Capability Vertex (Breaking the MCU): The STM32H7 is excellent for power (0.4W) and cost (₹3,500). However, the project mandates a complex software ecosystem: Docker containerisation, Python 3.11, Ansible playbooks, and PSI drift monitoring. An MCU runs bare-metal C/C++ or an RTOS; it fundamentally cannot run Linux or Docker. It fails the capability vertex required by the MLOps pipeline.
+	The Sweet Spot (Raspberry Pi 5 + Hailo): This setup is the only one that satisfies all three vertices simultaneously. At 7.5W, it stays safely under the 10W power limit. At ₹15,000, it is financially viable for a 265-truck rollout. Most importantly, it provides the full Linux/Debian architecture required to run the exact Docker, Python, and MQTT stack you are mandated to build, ensuring you hit the 90-second SLA without breaking the budget or the power supply.
+
