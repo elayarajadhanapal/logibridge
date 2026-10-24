@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LogiEdge simulator · cold-chain edge AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --frost:#E7EEF1; --panel:#FFFFFF; --ink:#16242E; --muted:#5A6A75; --line:#C9D5DB; --steel:#8DA1AC;
+  --edge:#0E6A87; --edge-soft:#D7EBF1; --cloud:#82569A; --cloud-soft:#EEE3F3;
+  --ok:#2E8455; --warn:#C98A12; --crit:#C2352B; --ok-soft:#DDF0E4; --warn-soft:#FBEFD3; --crit-soft:#F8DEDB;
+  --dead:#9AA7AE; --radius-l:10px; --radius-s:4px;
+  --num:'Barlow Semi Condensed','Roboto Condensed','Arial Narrow',system-ui,sans-serif;
+  --ui:'Barlow','Segoe UI',system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--frost);color:var(--ink);font:15px/1.45 var(--ui)}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--edge);outline-offset:2px}
+.num{font-family:var(--num);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:13px}
+
+/* top bar */
+header.bar{position:sticky;top:0;z-index:20;background:var(--ink);color:#E9F2F5;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:10px 18px}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand b{font-size:20px;font-weight:700;letter-spacing:.2px}
+.brand span{color:#9FB6C1;font-size:13px}
+.ctl{display:flex;align-items:center;gap:6px}
+.ctl label{font-size:12px;color:#9FB6C1}
+.bar select,.bar button{background:#22343F;border:1px solid #37505E;color:#E9F2F5;border-radius:var(--radius-s);padding:5px 9px;cursor:pointer}
+.bar button.on{background:#E9F2F5;color:var(--ink);border-color:#E9F2F5}
+.seg{display:inline-flex;border:1px solid #37505E;border-radius:var(--radius-s);overflow:hidden}
+.seg button{border:0;border-radius:0}
+.clock{font-family:var(--num);font-size:22px;font-weight:600;min-width:118px;text-align:right}
+.banner{display:none;background:var(--warn-soft);color:#6B4A05;padding:6px 18px;font-size:14px;border-bottom:1px solid #EAD39A}
+.banner.show{display:block}
+
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-l);padding:14px 16px;min-width:0}
+.panel h2{font-size:16px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.panel h2 .aside{margin-left:auto;font-weight:400;font-size:13px;color:var(--muted)}
+
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,2.1fr) minmax(320px,1fr);gap:16px}
+#map{width:100%;height:auto;display:block}
+.map-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);margin-top:6px}
+.sw{display:inline-block;width:18px;height:8px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.ribbons{margin-top:10px}
+.ribbon-row{display:grid;grid-template-columns:150px 1fr 88px;align-items:center;gap:10px;margin:4px 0}
+.ribbon-row canvas{width:100%;height:22px;display:block;border-radius:3px;background:#F3F6F7}
+.ribbon-row .who{font-size:13px;font-weight:600}
+.ribbon-row .pct{font-family:var(--num);font-size:15px;text-align:right}
+
+.scenario-card p{margin:0 0 10px;color:var(--muted);font-size:14px}
+table.score{width:100%;border-collapse:collapse;font-size:14px}
+table.score th{font-weight:600;text-align:right;padding:4px 6px;font-size:13px}
+table.score th:first-child{text-align:left;color:var(--muted);font-weight:500}
+table.score td{padding:5px 6px;border-top:1px solid #E4EBEE;text-align:right;font-family:var(--num);font-size:15px}
+table.score td:first-child{text-align:left;font-family:var(--ui);font-size:13px;color:var(--muted)}
+.th-edge{color:var(--edge)} .th-cloud{color:var(--cloud)}
+.good{color:var(--ok);font-weight:600} .bad{color:var(--crit);font-weight:600} .meh{color:var(--warn);font-weight:600}
+
+/* 3 columns */
+.cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr);gap:16px}
+.chart{width:100%;height:120px;display:block}
+.chart-h{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--muted);margin:8px 0 2px}
+.chart-h b{font-family:var(--num);font-size:20px;color:var(--ink);font-weight:600}
+.doorline{position:relative;height:26px;background:#F3F6F7;border-radius:3px;overflow:hidden}
+.doorline i{position:absolute;top:0;bottom:0;background:var(--warn);opacity:.55}
+.btnrow{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.btn{background:#F2F6F8;border:1px solid var(--line);border-radius:var(--radius-s);padding:4px 10px;cursor:pointer;font-size:14px}
+.btn:hover{border-color:var(--steel)}
+.btn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.danger.on{background:var(--crit);border-color:var(--crit)}
+.toggle{display:flex;align-items:center;gap:6px;font-size:14px;margin:4px 12px 4px 0;cursor:pointer}
+.ctrl-group{border-top:1px solid #E4EBEE;margin-top:10px;padding-top:8px}
+.ctrl-group .lbl{font-size:13px;color:var(--muted);margin-bottom:2px}
+
+/* pipeline */
+.class-badge{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:10px 12px;border-radius:8px;margin-bottom:10px;background:var(--ok-soft)}
+.class-badge .big{font-size:26px;font-weight:700;line-height:1}
+.class-badge.c1{background:var(--warn-soft)} .class-badge.c2{background:var(--crit-soft)}
+.probs{display:grid;gap:3px}
+.prob{display:grid;grid-template-columns:62px 1fr 40px;align-items:center;gap:6px;font-size:12px}
+.prob .b{height:8px;border-radius:4px;background:#E2E9EC;overflow:hidden}.prob .b i{display:block;height:100%}
+ol.stages{list-style:none;margin:0;padding:0;counter-reset:st}
+ol.stages li{counter-increment:st;display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:start;padding:6px 0;border-top:1px solid #EEF2F4;font-size:14px}
+ol.stages li::before{content:counter(st);font-family:var(--num);color:var(--steel);font-size:13px;text-align:right;padding-top:1px}
+ol.stages li .v{font-family:var(--num);color:var(--muted);font-size:13px;text-align:right;max-width:220px}
+ol.stages li.hot{background:linear-gradient(90deg,var(--edge-soft),transparent 70%)}
+ol.stages li.off .t{color:var(--crit)}
+.src{font-size:11px;border-radius:3px;padding:0 5px;margin-left:6px;border:1px solid var(--line);color:var(--muted)}
+.src.ext{background:var(--edge);color:#fff;border-color:var(--edge)}
+table.feat{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+table.feat td,table.feat th{padding:3px 4px;text-align:right;font-family:var(--num)}
+table.feat th{color:var(--muted);font-weight:500;font-family:var(--ui)}
+table.feat td:first-child,table.feat th:first-child{text-align:left;font-family:var(--ui)}
+.zhot{color:var(--crit);font-weight:600}
+
+/* ops feed */
+.linkstate{display:flex;gap:10px;align-items:center;font-size:14px;margin-bottom:8px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;background:var(--ok)} .dot.off{background:var(--crit)}
+.feed{max-height:420px;overflow:auto;margin:0;padding:0;list-style:none}
+.feed li{border-left:3px solid var(--steel);padding:5px 8px;margin:0 0 6px;background:#F6F9FA;border-radius:0 4px 4px 0;font-size:13px}
+.feed li.edge{border-color:var(--edge)} .feed li.cloud{border-color:var(--cloud)}
+.feed li .m{display:block;font-size:14px;color:var(--ink)}
+.feed li.c2 .m{color:var(--crit);font-weight:600} .feed li.c1 .m{color:#8A5D05;font-weight:600}
+.feed .meta{font-family:var(--num);color:var(--muted)}
+.late{color:var(--crit);font-weight:600}
+
+/* tabs */
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line);margin:-4px -4px 12px}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:8px 12px;cursor:pointer;font-weight:500;color:var(--muted)}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--edge)}
+.tabpane{display:none}.tabpane.on{display:block}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;background:#FBFCFD;text-align:left;width:100%}
+.card.sel{border:2px solid var(--edge);padding:9px 11px;background:var(--edge-soft)}
+.card h3{margin:0 0 4px;font-size:15px}
+.card .k{display:flex;justify-content:space-between;font-size:13px;border-top:1px dashed #DCE4E8;padding:3px 0}
+.card .k span:last-child{font-family:var(--num);font-size:14px}
+.ph{color:var(--warn);font-size:12px}
+#wiring{width:100%;height:auto;display:block}
+.periph{cursor:pointer}
+.bars .row{margin:6px 0}
+.bars .lab{display:flex;justify-content:space-between;font-size:13px}
+.bars .track{height:14px;background:#E6EDF0;border-radius:3px;display:flex;overflow:hidden}
+.bars .track i{display:block;height:100%;border-right:1px solid #fff}
+table.mem{width:100%;border-collapse:collapse;font-size:13px}
+table.mem td{padding:3px 4px;border-top:1px solid #EEF2F4}
+table.mem td:last-child{text-align:right;font-family:var(--num)}
+.layers{font-family:ui-monospace,Consolas,monospace;font-size:13px;margin:6px 0;padding:0;list-style:none}
+.layers li{padding:3px 8px;border-left:3px solid var(--ok);margin:2px 0;background:#F4F8F5}
+.layers li.rebuilt{border-color:var(--warn);background:var(--warn-soft)}
+pre.code{background:#F2F6F8;border:1px solid var(--line);border-radius:6px;padding:10px;font-size:12.5px;overflow:auto;max-height:340px}
+textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:6px;padding:8px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+input[type=text]{border:1px solid var(--line);border-radius:4px;padding:4px 8px;min-width:220px}
+table.topics{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+table.topics td{overflow-wrap:anywhere}
+table.topics td,table.topics th{padding:4px 6px;border-top:1px solid #EEF2F4;text-align:left;vertical-align:top}
+table.topics input{width:100%;min-width:0;font-family:ui-monospace,Consolas,monospace;font-size:12px}
+.pass{color:var(--ok);font-weight:600}.fail{color:var(--crit);font-weight:600}
+ul.tests{list-style:none;padding:0;margin:8px 0;columns:2;column-gap:24px}
+ul.tests li{break-inside:avoid;font-size:14px;padding:3px 0;border-top:1px solid #EEF2F4}
+ul.log{list-style:none;margin:0;padding:0;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;max-height:420px;overflow:auto}
+ul.log li{padding:2px 0;border-top:1px solid #F0F3F5}
+.assume{font-size:13px;color:var(--muted);border-left:3px solid var(--cloud);padding:4px 10px;margin:8px 0;background:var(--cloud-soft)}
+
+
+/* ===== single-screen stage ===== */
+html,body{height:100%}
+body{display:flex;flex-direction:column;overflow:hidden}
+header.bar{position:static;flex:none;padding:8px 16px;flex-wrap:nowrap;gap:12px}
+header.bar #scenario{max-width:270px}
+.brand span{white-space:nowrap}
+.clock{min-width:96px;font-size:20px}
+.details-btn{background:#E9F2F5!important;color:var(--ink)!important;font-weight:600}
+#stage{flex:1;min-height:0;display:grid;grid-template-rows:minmax(0,1.3fr) minmax(300px,1fr);gap:12px;padding:12px 16px 14px;max-width:none;margin:0;width:100%}
+.top{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(300px,1fr);gap:12px;min-height:0}
+.mapcard{display:flex;flex-direction:column;min-height:0}
+.mapcard #map{flex:1;min-height:0;width:100%;height:100%}
+.mapcard h2{margin-bottom:4px}
+.statuscard{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
+.status-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.st-label{font-size:13px;color:var(--muted)}
+.st-temp{font-size:44px;font-weight:600;line-height:1}
+.st-class{font-size:22px;font-weight:700;padding:6px 14px;border-radius:8px;background:var(--ok-soft);color:var(--ok)}
+.st-class.stale{background:#E6EDF0;color:var(--steel)}
+.st-class.c1{background:var(--warn-soft);color:#8A5D05}.st-class.c2{background:var(--crit-soft);color:var(--crit)}
+.spark{width:100%;height:76px;display:block}
+table.mini{width:100%;border-collapse:collapse;font-size:14px}
+table.mini th{font-size:12.5px;text-align:right;padding:2px 4px;font-weight:600}
+table.mini th:first-child{text-align:left}
+table.mini td{padding:4px;border-top:1px solid #E4EBEE;text-align:right;font-family:var(--num);font-size:15px}
+table.mini td:first-child{text-align:left;font-family:var(--ui);color:var(--muted);font-size:13px}
+.svcs{margin-top:auto;display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px}
+.svc{padding:1px 7px;border-radius:10px;border:1px solid var(--line);color:var(--muted);background:#F3F6F7}
+.svc.on{background:var(--ok-soft);color:var(--ok);border-color:#BFE0CC}
+.svc.off{background:var(--crit-soft);color:var(--crit);border-color:#EBC0BB}
+.st-ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.st-ctrls select{border:1px solid var(--line);border-radius:4px;padding:3px 6px;background:#fff}
+.seg.light{border-color:var(--line)}.seg.light button{background:#F2F6F8;padding:3px 9px;border:0;cursor:pointer;font-size:13px}
+.seg.light button.on{background:var(--ink);color:#fff}
+
+.flow{display:grid;grid-template-columns:minmax(0,.8fr) 88px minmax(0,2.1fr) 88px minmax(0,.95fr) 128px minmax(0,.95fr);align-items:stretch;min-height:0}
+.fcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-l);padding:12px 14px;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:6px}
+.fcard.dim{background:#F4F6F7;border-style:dashed}
+.fcard h3{margin:0;font-size:15px;font-weight:600;display:flex;align-items:center;gap:6px}
+.fcard h3 .tag{margin-left:auto;font-weight:400;font-size:12px;color:var(--muted)}
+.fcard .big{font-family:var(--num);font-size:clamp(20px,1.9vw,30px);font-weight:600;line-height:1.05;white-space:nowrap}
+.fcard .big small{font-size:.55em;font-weight:500;color:var(--muted)}
+.fcard .kv{display:flex;justify-content:space-between;font-size:13.5px;border-top:1px dashed #DCE4E8;padding-top:3px}
+.fcard .kv b{font-family:var(--num);font-weight:600;font-size:15px}
+.fcard select{border:1px solid var(--line);border-radius:4px;padding:2px 4px;background:#fff;font-size:13px;max-width:100%;min-width:0}
+#fcHw{flex:1}
+.edgegrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;min-height:0}
+.ecol{display:flex;flex-direction:column;gap:6px;min-width:0}
+.mcol{border-left:1px solid #E4EBEE;padding-left:14px;position:relative}
+.lbl-sm{font-size:12px;color:var(--muted);margin-bottom:-3px}
+.seg-sm{display:flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg-sm button{flex:1;border:0;border-left:1px solid var(--line);background:#F2F6F8;padding:5px 2px;font-size:13px;cursor:pointer;white-space:nowrap;min-width:0}
+.seg-sm button:first-child{border-left:0}
+.seg-sm button.on{background:var(--edge);color:#fff;font-weight:600}
+.otamsg{position:absolute;left:14px;right:0;bottom:0;background:var(--ink);color:#fff;border-radius:6px;padding:6px 8px;font-size:12.5px;opacity:0;transition:opacity .3s;pointer-events:none}
+.otamsg.show{opacity:.95}
+.meter{display:grid;gap:2px}
+.meter .top-l{display:flex;justify-content:space-between;font-size:13px}
+.meter .top-l b{font-family:var(--num);font-size:16px}
+.meter .trk{position:relative;height:10px;background:#E6EDF0;border-radius:5px;overflow:hidden}
+.meter .trk i{position:absolute;left:0;top:0;bottom:0;background:var(--edge);border-radius:5px}
+.meter .trk em{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--crit)}
+.meter canvas{width:100%;height:22px;display:block}
+.storebar{height:16px;background:#E6EDF0;border-radius:4px;display:flex;overflow:hidden}
+.storebar i{display:block;height:100%}
+.alerts-mini{list-style:none;margin:0;padding:0;font-size:12.5px;overflow:hidden}
+.alerts-mini li{padding:3px 6px;margin-top:3px;border-left:3px solid var(--steel);background:#F6F9FA}
+.alerts-mini li.c1{border-color:var(--warn)}.alerts-mini li.c2{border-color:var(--crit)}
+.alerts-mini .late{font-family:var(--num)}
+
+.conn{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:stretch;padding:0 4px;text-align:center;min-width:0}
+.conn .cl{font-size:12px;color:var(--muted);line-height:1.2;min-height:30px;display:flex;flex-direction:column;justify-content:flex-end}
+.conn .cv{font-family:var(--num);font-size:15px;font-weight:600;color:var(--ink);line-height:1.2;min-height:34px}
+.conn svg{width:100%;height:22px;display:block;overflow:visible}
+.conn .ln{stroke:#C9D3D8;stroke-width:3;stroke-dasharray:8 6;fill:none}
+.conn.flowing .ln{stroke:var(--edge);animation:dash 0.9s linear infinite}
+.conn.burst .ln{stroke:var(--ok);stroke-width:6;animation:dash 0.25s linear infinite}
+.conn.cut .ln{stroke:var(--crit);stroke-dasharray:3 7;animation:none}
+.conn.cloud.flowing .ln{stroke:var(--cloud)}
+@keyframes dash{to{stroke-dashoffset:-28}}
+.conn .ah{fill:#C9D3D8}.conn.flowing .ah{fill:var(--edge)}.conn.burst .ah{fill:var(--ok)}.conn.cloud.flowing .ah{fill:var(--cloud)}.conn.cut .ah{fill:var(--crit)}
+.floaters{position:absolute;left:0;right:0;top:calc(50% - 46px);height:0;pointer-events:none}
+.floaters span{position:absolute;left:50%;transform:translate(-50%,-6px);font-family:var(--num);font-size:13px;font-weight:600;color:var(--edge);white-space:nowrap;animation:floatup 1.4s ease-out forwards}
+.conn.cloud .floaters span{color:var(--cloud)}
+.floaters span.red{color:var(--crit)}
+@keyframes floatup{from{opacity:1;transform:translate(-50%,-8px)}to{opacity:0;transform:translate(-50%,-40px)}}
+.syncmsg{position:absolute;left:-6px;right:-6px;top:10px;font-size:12px!important;z-index:2;text-align:center;background:var(--ok);color:#fff;border-radius:6px;padding:4px 6px;font-size:12.5px;font-weight:600;opacity:0;transition:opacity .3s}
+.syncmsg.show{opacity:1}
+.syncmsg.lost{background:var(--crit)}
+.syncmsg.ota{background:var(--ink)}
+
+.details{position:fixed;inset:0;background:var(--frost);z-index:50;display:flex;flex-direction:column}
+.details[hidden]{display:none}
+.details-head{display:flex;gap:12px;align-items:center;padding:10px 18px;background:var(--panel);border-bottom:1px solid var(--line)}
+.details-head .btn{margin-left:auto}
+.details-body{flex:1;overflow:auto;padding:16px 18px 40px;display:grid;gap:16px;align-content:start}
+.hero2{display:grid;grid-template-columns:minmax(0,2fr) minmax(320px,1fr);gap:16px;align-items:start}
+@media (max-width:1100px){.flow{grid-template-columns:1fr;overflow:auto}.conn{min-height:70px}.top{grid-template-columns:1fr}body{overflow:auto}#stage{grid-template-rows:auto auto}.hero2{grid-template-columns:1fr}}
+
+@media (max-width:1180px){.hero,.cols{grid-template-columns:1fr}.grid3{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}ul.tests{columns:1}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><b>LogiEdge</b><span>truck <span id="truckId"></span></span></div>
+  <div class="ctl"><label for="scenario">Scenario</label><select id="scenario"></select></div>
+  <div class="ctl"><span class="seg" id="viewSeg"><button data-v="cloud">Without edge</button><button data-v="edge">With edge</button></span></div>
+  <div class="ctl"><button id="play" aria-label="Play or pause">▶ Run</button><button id="stepBtn" title="Advance 10 simulated seconds">+10 s</button><button id="resetBtn">Reset</button></div>
+  <div class="ctl"><select id="speed" aria-label="Simulation speed"><option value="1">1×</option><option value="10">10×</option><option value="60">60×</option><option value="180" selected>180×</option><option value="600">600×</option></select></div>
+  <div class="clock" id="clock">00:00:00</div>
+  <button id="detailsBtn" class="details-btn">Details</button>
+</header>
+<div class="banner" id="extBanner">External data is driving the edge node. Speed is locked to 1× so timestamps line up with your Python services.</div>
+<main id="stage">
+  <section class="top">
+    <div class="panel mapcard">
+      <h2>Nashik → Aurangabad <span class="aside" id="routeInfo"></span></h2>
+      <svg id="map" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Route map with signal gaps and truck position"></svg>
+      <div class="map-legend">
+        <span><i class="sw" style="background:var(--edge)"></i>Route covered</span>
+        <span><i class="sw" style="background:repeating-linear-gradient(45deg,var(--dead) 0 3px,transparent 3px 6px)"></i>No cellular signal</span>
+        <span><i class="sw" style="background:var(--warn)"></i>Delivery stop</span>
+      </div>
+    </div>
+    <div class="panel statuscard">
+      <div class="status-head"><div><div class="st-label">Cargo</div><div class="st-temp num" id="stTemp">4.0 °C</div><div class="small muted" id="stSub"></div></div><div class="st-class" id="stClass">Normal</div></div>
+      <canvas id="stSpark" class="spark"></canvas>
+      <table class="mini" id="stScore"></table>
+      <div class="svcs" id="stSvc"></div>
+      <div class="st-ctrls">
+        <label>Inject <select id="stAnom"><option value="none">no anomaly</option><option value="temp_drift">temp_drift</option><option value="vibration">vibration</option><option value="combined">combined</option></select></label>
+        <span class="seg light" id="stLink"><button data-m="auto">Route signal</button><button data-m="on">On</button><button data-m="off">Off</button></span>
+      </div>
+    </div>
+  </section>
+  <section class="flow" id="flow">
+    <div class="fcard" id="fSensors"></div>
+    <div class="conn" id="cA"></div>
+    <div class="fcard chip" id="fChip"></div>
+    <div class="conn" id="cB"></div>
+    <div class="fcard" id="fStore"></div>
+    <div class="conn wireless" id="cC"></div>
+    <div class="fcard" id="fBackend"></div>
+  </section>
+</main>
+
+<div id="details" class="details" role="dialog" aria-modal="true" aria-label="Details" hidden>
+  <div class="details-head"><b>Details</b><span class="muted small">Esc or D to close</span><button class="btn" id="closeDetails">Close</button></div>
+  <div class="details-body">
+  <section class="hero2">
+    <div class="panel"><h2>Temperature record held by the operations centre</h2>
+        <div class="ribbon-row"><span class="who" style="color:var(--edge)">Edge record at ops</span><canvas id="ribEdge" height="22"></canvas><span class="pct" id="pctEdge"></span></div>
+        <div class="ribbon-row"><span class="who" style="color:var(--cloud)">Cloud-only record</span><canvas id="ribCloud" height="22"></canvas><span class="pct" id="pctCloud"></span></div>
+        <div class="small muted">Each cell is one minute of the cargo temperature record as the operations centre holds it. Hatched means nothing arrived. Edge cells fill in after a signal gap when the queued log syncs.</div>
+    </div>
+    <div class="panel scenario-card">
+      <h2 id="scTitle">Scenario</h2>
+      <p id="scBlurb"></p>
+      <table class="score" id="score"></table>
+      <div class="assume"><b>Cloud-only baseline</b> streams temperature over cellular, does not upload 500 Hz vibration (too costly), keeps no local buffer, runs threshold rules in the cloud, and relies on manual log entries every 2 h.</div>
+    </div>
+  
+  </section>
+
+  <section class="cols">
+    <div class="panel">
+      <h2>Sensors <span class="aside" id="sensorSrc"></span></h2>
+      <div class="chart-h"><span>Cargo temperature, °C · setpoint 4.0</span><b id="vTemp">–</b></div>
+      <canvas class="chart" id="cTemp"></canvas>
+      <div class="chart-h"><span>Compressor vibration RMS, g</span><b id="vVib">–</b></div>
+      <canvas class="chart" id="cVib"></canvas>
+      <div class="chart-h"><span>Door</span><b id="vDoor">CLOSE</b></div>
+      <div class="doorline" id="doorLine"></div>
+      <div class="ctrl-group"><div class="lbl">Inject anomaly (same modes as <code>simulator.py --anomaly</code>)</div>
+        <div class="btnrow" id="anomBtns"></div></div>
+      <div class="ctrl-group"><div class="lbl">Cellular</div><div class="btnrow" id="linkBtns"></div>
+        <label class="toggle"><input type="checkbox" id="autoResp"> Driver responds to alerts (5 min)</label>
+        <label class="toggle"><input type="checkbox" id="shiftStats"> Normalise with stats shifted by 3σ (Task C2 experiment)</label>
+      </div>
+    </div>
+    <div class="panel">
+      <h2 id="pipeTitle">Edge pipeline <span class="aside" id="pipeHw"></span></h2>
+      <div class="class-badge" id="classBadge"><div class="big" id="className">–</div><div class="probs" id="probs"></div></div>
+      <ol class="stages" id="stages"></ol>
+      <table class="feat" id="featTable"></table>
+    </div>
+    <div class="panel">
+      <h2>Operations centre</h2>
+      <div class="linkstate"><span class="dot" id="linkDot"></span><span id="linkTxt"></span></div>
+      <div class="small muted" id="queueTxt"></div>
+      <ul class="feed" id="feed"></ul>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-t="hw" aria-selected="true">Hardware and wiring</button>
+      <button role="tab" data-t="mem">Memory and data</button>
+      <button role="tab" data-t="models">Models and OTA</button>
+      <button role="tab" data-t="drift">Drift monitor</button>
+      <button role="tab" data-t="int">Connect your code</button>
+      <button role="tab" data-t="test">Self-test</button>
+      <button role="tab" data-t="log">Event log</button>
+    </div>
+    <div class="tabpane on" id="tab-hw">
+      <div class="grid3" id="hwCards"></div>
+      <div class="grid2" style="margin-top:14px">
+        <div><svg id="wiring" viewBox="0 0 760 330" role="img" aria-label="Edge node wiring; click a peripheral to connect or disconnect"></svg><div class="small muted">Click a peripheral to unplug or reconnect it and watch the pipeline react.</div></div>
+        <div><h3 style="margin:0 0 6px;font-size:15px">Roofline check for the selected node</h3>
+          <div class="small">Model work <input type="text" id="rfFlops" value="45" style="min-width:60px;width:60px"> MFLOPs per inference, data moved <input type="text" id="rfBytes" value="18" style="min-width:60px;width:60px"> MB</div>
+          <svg id="roofline" viewBox="0 0 360 200" style="width:100%;max-width:460px"></svg>
+          <div class="small" id="rfTxt"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tabpane" id="tab-mem"><div class="grid2"><div id="memBars" class="bars"></div><div id="dataBox"></div></div></div>
+    <div class="tabpane" id="tab-models"><div class="grid3" id="modelCards"></div><div class="grid2" style="margin-top:14px"><div id="otaBox"></div><div id="fitBox"></div></div></div>
+    <div class="tabpane" id="tab-drift"><div class="grid2"><div><canvas class="chart" id="cPsi" style="height:180px"></canvas><div class="small muted" id="psiTxt"></div></div><div id="psiSide"></div></div></div>
+    <div class="tabpane" id="tab-int"></div>
+    <div class="tabpane" id="tab-test"><button class="btn" id="runTests">Run all self-tests</button> <span id="testSummary" class="small"></span><ul class="tests" id="testList"></ul></div>
+    <div class="tabpane" id="tab-log"><ul class="log" id="logList"></ul></div>
+  </section>
+
+  </div>
+</div>
+<script>
+/* =====================================================================
+   LogiEdge simulator — CORE (pure logic, no DOM)
+   Everything the UI shows comes from Sim.state. Tests drive this directly.
+   ===================================================================== */
+const LE = (typeof window !== 'undefined' ? (window.LE = window.LE || {}) : {});
+
+/* ---------- 1. CONFIG: edit freely; everything below reads from here ---------- */
+LE.CONFIG = {
+  truckId: 'MH15-RF-0427',
+  setpoint: 4.0,
+  // Sensor model (mirrors Task C1 table)
+  tempNoise: 0.3, vibMean: 0.45, vibNoise: 0.05, vibAnomMean: 1.2, vibAnomNoise: 0.15,
+  linearDriftPerReading: 0.08,      // CLI --anomaly temp_drift
+  // Physical plant used by the incident scenarios
+  ambient: 32, failInitialRatePerMin: 1.0, reeferPullPerMin: 0.15, doorLeakPerMin: 0.12,
+  // Preprocessing (Task C2)
+  maLen: 5, winLen: 30, winStep: 10,
+  // Trip: Nashik -> Aurangabad. Minutes from departure.
+  tripMinutes: 660,
+  deadZones: [[40, 35], [110, 40], [190, 50], [270, 90], [400, 45], [470, 38], [560, 60]], // [start, duration]
+  stops: [{ name: 'Niphad pharmacy', start: 90, dur: 15 }, { name: 'Vaijapur district hospital', start: 330, dur: 20 }],
+  // Alerting + response
+  alertDebounce: 2, clearAfter: 3, driverResponseMin: 5,
+  spoilAboveC: 8, spoilMinutes: 30, cargoValueINR: 2800000,
+  custodyAcceptPct: 98,
+  // Cloud-only baseline (assumptions shown in UI)
+  cloudRttMs: { mean: 900, jitter: 700, spikeProb: 0.05, spikeMs: 6000 },
+  manualLogEveryMin: 120,
+  // Data volumes (bytes) — change to match your own A1 assumptions
+  bytes: { tempRaw: 4, vibRawPerAxis: 2, vibHz: 500, vibAxes: 3, door: 16,
+           cloudTempMsg: 40, windowRecord: 32, alert: 96, custodyMinute: 48, heartbeat: 32 },
+  modemW: { idle: 0.25, searching: 0.5, tx: 1.2 },
+  costPerMB: 0.10, fleetPilot: 85, fleetFull: 265, aiPowerBudgetW: 10,
+  psi: { everySec: 60, rolling: 100, alertAt: 0.25, okBelow: 0.10, confidence: 'pNormal' }, // 'max' | 'pNormal'
+  externalTimeoutSec: 5,
+};
+
+/* ---------- 2. Catalogues: hardware, peripherals, models ---------- */
+LE.HARDWARE = {
+  rpi5: { name: 'Raspberry Pi 5 (8 GB) + AI HAT+', chips: ['BCM2712 · 4× Cortex-A76', 'Hailo-8L NPU · 13 TOPS', 'LPDDR4X 8 GB', 'microSD 32 GB'],
+    priceINR: 15000, tdpW: 7.5, idleW: 2.7, basePct: 6, sampleMs: 0.4, featMs: 2.0, txMsPerKB: 0.05, latFactor: 1.0, gflops: 16, gbps: 12, docker: true, runtime: 'Linux · Docker · TFLite runtime',
+    ram: { totalKB: 8 * 1024 * 1024, baseKB: 620 * 1024, label: 'RAM' }, store: { totalKB: 32 * 1024 * 1024, baseKB: 7 * 1024 * 1024, label: 'microSD' },
+    buses: { temp: '1-Wire', accel: 'SPI0', door: 'GPIO17', gps: 'UART0', modem: 'USB', buzzer: 'GPIO27' } },
+  jetson: { name: 'Jetson Orin Nano Super', chips: ['6× Cortex-A78AE', 'Ampere GPU · 67 TOPS', 'LPDDR5 8 GB (shared)', 'NVMe 128 GB'],
+    priceINR: 45000, tdpW: 15, idleW: 5.0, basePct: 9, sampleMs: 0.3, featMs: 1.2, txMsPerKB: 0.04, latFactor: 0.35, gflops: 1000, gbps: 102, docker: true, runtime: 'JetPack Linux · Docker · TFLite/TensorRT',
+    ram: { totalKB: 8 * 1024 * 1024, baseKB: 1500 * 1024, label: 'RAM' }, store: { totalKB: 128 * 1024 * 1024, baseKB: 18 * 1024 * 1024, label: 'NVMe' },
+    buses: { temp: 'I2C', accel: 'SPI1', door: 'GPIO', gps: 'UART1', modem: 'USB', buzzer: 'GPIO' } },
+  stm32: { name: 'STM32H7 MCU + sensor ICs', chips: ['Cortex-M7 · 480 MHz', 'no NPU', 'SRAM 1 MB', 'Flash 2 MB'],
+    priceINR: 3500, tdpW: 0.4, idleW: 0.12, basePct: 2, sampleMs: 25, featMs: 6.0, txMsPerKB: 2.0, latFactor: 6.0, gflops: 0.9, gbps: 2, docker: false, runtime: 'FreeRTOS · TFLite Micro',
+    ram: { totalKB: 1024, baseKB: 96, label: 'SRAM' }, store: { totalKB: 2048, baseKB: 420, label: 'Flash' },
+    buses: { temp: 'ADC/1-Wire', accel: 'SPI1', door: 'EXTI GPIO', gps: 'USART2', modem: 'USART3', buzzer: 'GPIO' } },
+};
+LE.PERIPHERALS = {
+  temp:   { short: 'Temperature probe', name: 'Cargo temperature probe', note: 'temperature · 1 Hz' },
+  accel:  { short: 'Accelerometer', name: '3-axis accelerometer on compressor', note: 'vibration · 500 Hz → RMS' },
+  door:   { short: 'Door reed switch', name: 'Door reed switch', note: 'OPEN / CLOSE events' },
+  gps:    { short: 'GPS module', name: 'GPS module', note: 'position for map + log' },
+  modem:  { short: 'Cellular modem', name: 'Cellular modem (4G / M2M SIM)', note: 'uplink to ops centre' },
+  buzzer: { short: 'Cab buzzer', name: 'Cab buzzer + display', note: 'local driver alert' },
+};
+// PLACEHOLDER numbers — replace with your benchmark_results.csv via LogiEdge.setModelMetrics / CSV import
+LE.MODELS = {
+  M1: { label: 'M1 · FP32 baseline', sizeKB: 1120, arenaKB: 96, latencyMs: 2.4, p95Ms: 3.1, accuracy: null, energyMJ: null, recallC2: null, probNoise: 0.0, placeholder: true },
+  M2: { label: 'M2 · PTQ INT8', sizeKB: 280, arenaKB: 32, latencyMs: 0.9, p95Ms: 1.3, accuracy: null, energyMJ: null, recallC2: null, probNoise: 0.02, placeholder: true },
+  M3: { label: 'M3 · Pruned 35% + INT8', sizeKB: 182, arenaKB: 24, latencyMs: 0.7, p95Ms: 1.0, accuracy: null, energyMJ: null, recallC2: null, probNoise: 0.04, placeholder: true },
+};
+LE.FEATURES = ['temp_mean', 'temp_std', 'temp_roc', 'vib_rms', 'vib_peak', 'vib_kurtosis'];
+LE.CLASSES = ['Normal', 'Warning', 'Critical'];
+LE.SCENARIOS = {
+  free: { title: 'Free run', blurb: 'Normal trip. Use the anomaly buttons (same modes as the simulator CLI) to inject faults.', autoResponse: false },
+  s1: { title: 'Incident 1 · Reefer fails in a dead zone', blurb: 'Refrigeration unit fails at minute 280, ten minutes into the 90-minute signal gap before Vaijapur. Cargo heats ~1 °C/min.', autoResponse: true },
+  s2: { title: 'Incident 2 · Chain-of-custody gap', blurb: 'No fault. Deliveries happen inside signal gaps. The hospital checks the temperature record at handover.', autoResponse: true },
+  s3: { title: 'Incident 3 · Compressor bearing wear', blurb: 'Vibration creeps up all trip (time-compressed: one trip ≈ three days of wear) until the compressor seizes at minute 460.', autoResponse: true },
+};
+
+/* ---------- 3. Small math helpers ---------- */
+LE.math = {
+  rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; },
+  gauss(r) { let u = 0, v = 0; while (u === 0) u = r(); while (v === 0) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); },
+  mean(a) { return a.reduce((s, x) => s + x, 0) / a.length; },
+  std(a) { const m = LE.math.mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / a.length); },
+  slope(ts, ys) { const mt = LE.math.mean(ts), my = LE.math.mean(ys); let n = 0, d = 0; for (let i = 0; i < ts.length; i++) { n += (ts[i] - mt) * (ys[i] - my); d += (ts[i] - mt) ** 2; } return d ? n / d : 0; },
+  kurtosisFisher(a) { const m = LE.math.mean(a); const v = a.reduce((s, x) => s + (x - m) ** 2, 0) / a.length; if (v < 1e-12) return 0; return a.reduce((s, x) => s + (x - m) ** 4, 0) / a.length / (v * v) - 3; },
+  sig(x) { return 1 / (1 + Math.exp(-x)); },
+  psi(expected, actual, eps = 1e-4) { let s = 0; for (let i = 0; i < expected.length; i++) { const e = Math.max(expected[i], eps), a = Math.max(actual[i], eps); s += (a - e) * Math.log(a / e); } return s; },
+  bins4(values) { const c = [0, 0, 0, 0]; values.forEach(v => { c[Math.min(3, Math.max(0, Math.floor(v * 4)))]++; }); return c.map(x => x / Math.max(1, values.length)); },
+  haversineKm(a, b) { const R = 6371, r = Math.PI / 180; const dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r; const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); },
+};
+
+/* ---------- 4. Route ---------- */
+LE.ROUTE = [
+  { name: 'Nashik', ll: [19.9975, 73.7898] }, { name: 'Niphad', ll: [20.0800, 74.1100] }, { name: 'Yeola', ll: [20.0420, 74.4890] },
+  { name: 'Vaijapur', ll: [19.9230, 74.7280] }, { name: 'Gangapur', ll: [19.6970, 75.0100] }, { name: 'Aurangabad', ll: [19.8762, 75.3433] },
+];
+LE.buildRoute = function (cfg) {
+  const pts = LE.ROUTE; const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + LE.math.haversineKm(pts[i - 1].ll, pts[i].ll));
+  const totalKm = cum[cum.length - 1];
+  const townP = name => cum[pts.findIndex(p => p.name === name.split(' ')[0])] / totalKm;
+  // time -> progress keyframes (minutes); truck dwells at stops
+  const kf = [[0, 0]];
+  cfg.stops.forEach(s => { const p = townP(s.name); kf.push([s.start, p]); kf.push([s.start + s.dur, p]); });
+  kf.push([cfg.tripMinutes, 1]);
+  const progressAt = min => { for (let i = 1; i < kf.length; i++) if (min <= kf[i][0]) { const [t0, p0] = kf[i - 1], [t1, p1] = kf[i]; return t1 === t0 ? p1 : p0 + (p1 - p0) * (min - t0) / (t1 - t0); } return 1; };
+  const llAt = p => { const km = p * totalKm; for (let i = 1; i < cum.length; i++) if (km <= cum[i]) { const f = (km - cum[i - 1]) / (cum[i] - cum[i - 1]); const a = pts[i - 1].ll, b = pts[i].ll; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; } return pts[pts.length - 1].ll; };
+  return { pts, cum, totalKm, progressAt, llAt, townProgress: pts.map((p, i) => cum[i] / totalKm) };
+};
+
+/* ---------- 5. The simulator ---------- */
+class Sim {
+  constructor(opts = {}) {
+    this.cfg = JSON.parse(JSON.stringify(LE.CONFIG)); Object.assign(this.cfg, opts.config || {});
+    this.models = JSON.parse(JSON.stringify(LE.MODELS));
+    this.listeners = {}; this.classifier = null; this.trainingStats = opts.trainingStats || null; this.referenceDist = opts.referenceDist || null;
+    this.bootstrap = !!opts.bootstrap;
+    this.reset(opts.scenario || 'free', opts.seed ?? 42);
+  }
+  on(evt, cb) { (this.listeners[evt] = this.listeners[evt] || []).push(cb); return () => { this.listeners[evt] = this.listeners[evt].filter(f => f !== cb); }; }
+  emit(evt, data) { (this.listeners[evt] || []).forEach(cb => { try { cb(data); } catch (e) { console.error(e); } }); }
+
+  reset(scenario = 'free', seed = 42) {
+    const c = this.cfg; this.route = LE.buildRoute(c); this.rand = LE.math.rng(seed); this.seed = seed;
+    const keep = this.s || {};
+    this.s = {
+      t: 0, T: c.tripMinutes * 60, scenario, done: false,
+      hw: keep.hw || 'rpi5', model: keep.model || 'M2',
+      peripherals: keep.peripherals || { temp: true, accel: true, door: true, gps: true, modem: true, buzzer: true },
+      linkOverride: keep.linkOverride || 'auto', shiftStats: keep.shiftStats || false,
+      autoResponse: LE.SCENARIOS[scenario].autoResponse, anomaly: 'none',
+      door: 'CLOSE', doorLog: [], connected: true, linkLog: [],
+      ops: [], log: [], ota: [], syncs: [], cpuHist: [], powHist: [], chip: { cpu: 0, power: 0, modem: 'idle' }, psiHist: [], driftAlerts: [],
+      external: { temperature: -1e9, vibration: -1e9, door: -1e9, features: -1e9, inference: -1e9, drift: -1e9, link: -1e9, gps: -1e9, node: -1e9, storage: -1e9, sync: -1e9, alerts: -1e9, model_active: -1e9, status: -1e9 },
+      extLink: null, extGps: null, extDrift: null, extNode: null, extStorage: null, services: {}, extOwner: { alerts: false },
+      edge: this._twin('edge'), cloud: this._twin('cloud'),
+      lastGps: this.route.llAt(0),
+    };
+    this.s.edge.plant.T = c.setpoint; this.s.cloud.plant.T = c.setpoint;
+    this._log('sim', `Reset: ${LE.SCENARIOS[scenario].title}`);
+    this.emit('reset', this.s);
+    return this;
+  }
+  _twin(kind) {
+    return { kind,
+      plant: { T: 4, fail: false, linear: false, linOff: 0, vibStep: false, ramp: null, mitigated: false, breakdown: false, breakdownAt: null },
+      rawT: [], rawV: [], fT: [], fV: [], // filtered: [t, value]
+      hist: { temp: [], vib: [], cls: [] },   // temp/vib per second (vib held), cls per window [t, cls]
+      lastFeat: null, lastZ: null, lastInf: null, seq: [], alertState: 0, zeroRun: 0,
+      alerts: [], queue: [], localLogBytes: 0, custody: [], pendingDriver: null,
+      bytes: { generated: 0, up: 0 }, lost: 0, cloudRx: [], manual: [],
+      out: { onset: null, detect: null, warnFirst: null, maxT: 4, secAbove: 0, breakdown: false, mitigationAt: null },
+      confs: [], faultRaised: false };
+  }
+  _log(src, msg) { const e = { t: this.s.t, src, msg }; this.s.log.push(e); if (this.s.log.length > 600) this.s.log.shift(); this.emit('log', e); }
+
+  /* ---- world helpers ---- */
+  minute() { return this.s.t / 60; }
+  inDeadZone(min = this.minute()) { return this.cfg.deadZones.some(([a, d]) => min >= a && min < a + d); }
+  linkUp() {
+    const s = this.s; if (!s.peripherals.modem) return false;
+    if (s.linkOverride === 'on') return true; if (s.linkOverride === 'off') return false;
+    return !this.inDeadZone();
+  }
+  cloudLinkUp() { const s = this.s; if (s.linkOverride === 'on') return true; if (s.linkOverride === 'off') return false; return !this.inDeadZone(); }
+  rtt() { const r = this.cfg.cloudRttMs; let v = r.mean + (this.rand() * 2 - 1) * r.jitter; if (this.rand() < r.spikeProb) v += r.spikeMs; return Math.max(80, v) / 1000; }
+  isExt(stream) { return this.s.external[stream] > this.s.t - this.cfg.externalTimeoutSec; }
+
+  /* ---- controls ---- */
+  setAnomaly(mode) {
+    const s = this.s; s.anomaly = mode;
+    [s.edge, s.cloud].forEach(tw => { const p = tw.plant; p.linear = (mode === 'temp_drift' || mode === 'combined'); p.vibStep = (mode === 'vibration' || mode === 'combined'); if (!p.linear) p.linOff = 0; p.mitigated = false; if (mode !== 'none' && tw.out.onset === null) tw.out.onset = s.t; });
+    this._log('sim', `Anomaly mode → ${mode}`); this.emit('anomaly', mode);
+  }
+  setModel(id) {
+    if (!this.models[id] || id === this.s.model) return; const from = this.s.model; this.s.model = id;
+    const hw = LE.HARDWARE[this.s.hw], m = this.models[id];
+    const ev = { t: this.s.t, from, to: id, docker: hw.docker, bytes: m.sizeKB * 1024,
+      layers: hw.docker ? [
+        { cmd: 'FROM python:3.11-slim', cached: true }, { cmd: 'RUN pip install tflite-runtime paho-mqtt numpy', cached: true },
+        { cmd: 'COPY inference_service.py .', cached: true }, { cmd: `COPY model.tflite .   (${m.sizeKB} KB)`, cached: false },
+        { cmd: 'ENV MODEL_PATH=/app/model.tflite', cached: false }] :
+        [{ cmd: 'Firmware image unchanged', cached: true }, { cmd: `Model blob → flash slot B (${m.sizeKB} KB)`, cached: false }, { cmd: 'Verify CRC + swap slot on reboot', cached: false }] };
+    this.s.ota.unshift(ev); this._log('ota', `Model ${from} → ${id} (${hw.docker ? 'only model layer rebuilt' : 'model blob to flash slot'})`); this.emit('model', ev);
+  }
+  setHardware(id) { if (!LE.HARDWARE[id]) return; this.s.hw = id; this._log('hw', `Edge node → ${LE.HARDWARE[id].name}`); this.emit('hardware', id); }
+  setPeripheral(id, on) { if (!(id in this.s.peripherals)) return; this.s.peripherals[id] = on; this._log('hw', `${LE.PERIPHERALS[id].name} ${on ? 'connected' : 'disconnected'}`); this.emit('peripheral', { id, on }); }
+  setLink(mode) { this.s.linkOverride = mode; this._log('link', `Cellular override → ${mode}`); }
+
+  /* ---- external data (from your Python via MQTT, or JS) ---- */
+  ext(stream, msg) {
+    const s = this.s, tw = s.edge; s.external[stream] = s.t;
+    if (stream === 'temperature') { this._pushTemp(tw, +msg.value); }
+    else if (stream === 'vibration') { this._pushVib(tw, +msg.value); }
+    else if (stream === 'door') { this._door(msg.state === 'OPEN' ? 'OPEN' : 'CLOSE', 'external'); }
+    else if (stream === 'features') { this._afterFeatures(tw, msg.raw || null, msg.norm || null); }
+    else if (stream === 'inference') { this._afterInference(tw, { cls: +msg.class, probs: msg.probs || null, latencyMs: msg.latency_ms ?? null, model: msg.model || s.model, source: 'external' }); }
+    else if (stream === 'drift') { s.extDrift = +msg.psi; this._psiPoint(+msg.psi, 'external'); }
+    else if (stream === 'link') { s.extLink = !!msg.cellular; }
+    else if (stream === 'gps') { s.extGps = [+msg.lat, +msg.lon]; }
+    else if (stream === 'node') { s.extNode = { cpu: +msg.cpu_pct, power: +msg.power_w, ramUsedKB: msg.ram_used_kb ?? null, ramTotalKB: msg.ram_total_kb ?? null, src: msg.power_src || 'estimate' }; }
+    else if (stream === 'storage') { s.extStorage = { stored: +msg.stored_bytes, queued: +msg.queued_bytes, records: msg.queued_records ?? null, sent: +msg.sent_bytes }; }
+    else if (stream === 'sync') { s.syncs.push({ t: s.t, n: +msg.records, bytes: +msg.bytes, gap: msg.gap_s ?? null, ext: true }); this._log('ext', `Sync reported: ${msg.records} records, ${msg.bytes} B`); }
+    else if (stream === 'alerts') {
+      s.extOwner.alerts = true; const delay = (msg.ts != null && msg.raised_ts != null) ? Math.max(0, msg.ts - msg.raised_ts) : 0;
+      const a = { arch: 'edge', cls: +msg.class, msg: msg.msg || LE.CLASSES[+msg.class], t: s.t - delay, recvT: s.t, delay, ext: true };
+      s.ops.unshift(a); if (s.ops.length > 300) s.ops.pop(); this._log('ext', `Alert received at ops: ${a.msg}`); this.emit('ops', a);
+    }
+    else if (stream === 'model_active') { s.modelConfirmed = { model: msg.model, sha: msg.sha256 || null, sizeKB: msg.size_kb ?? null }; if (this.models[msg.model] && msg.model !== s.model) this.setModel(msg.model); if (msg.size_kb && this.models[msg.model]) this.models[msg.model].sizeKB = +msg.size_kb; }
+    else if (stream === 'status') { const name = msg._service || 'unknown'; s.services[name] = { online: !!msg.online, t: s.t }; if (name === 'uplink_agent' && msg.online) s.extOwner.alerts = true; this._log('ext', `Service ${name} ${msg.online ? 'online' : 'OFFLINE'}`); }
+    this.emit('external', { stream, msg });
+  }
+
+  /* ---- main step: one simulated second ---- */
+  step() {
+    const s = this.s, c = this.cfg; if (s.done) return;
+    s.t += 1; const t = s.t, min = t / 60;
+    // connectivity edges
+    const up = this.linkUp(); if (up !== s.connected) { s.connected = up; s.linkLog.push([t, up]); this._log('link', up ? 'Cellular restored' : 'Cellular lost'); if (up) this._flush(); this.emit('link', up); }
+    // doors at stops (scenario world, same for both twins)
+    if (!this.isExt('door') && s.peripherals.door) c.stops.forEach(st => { if (Math.abs(min - (st.start + 1)) < 1 / 120) this._door('OPEN', st.name); if (Math.abs(min - (st.start + st.dur - 1)) < 1 / 120) this._door('CLOSE', st.name); });
+    // scenario schedule
+    if (s.scenario === 's1' && t === 280 * 60) [s.edge, s.cloud].forEach(tw => { tw.plant.fail = true; tw.plant.vibStep = true; tw.plant.mitigated = false; tw.out.onset = t; tw.out.detect = null; tw.out.mitigationAt = null; tw.pendingDriver = null; }), this._log('sim', 'Refrigeration unit failure (both twins)');
+    if (s.scenario === 's3') [s.edge, s.cloud].forEach(tw => { const p = tw.plant; if (t === 1) { p.ramp = { t0: 0, t1: 460 * 60, from: c.vibMean, to: 1.25 }; tw.out.onset = 1; } if (t === 460 * 60 && !p.mitigated) { p.fail = true; p.vibStep = true; p.breakdown = true; tw.out.breakdown = true; this._log('sim', `Compressor seized (${tw.kind})`); } });
+    // shared noise draw (same physics noise for both twins)
+    const nT = LE.math.gauss(this.rand), nV = LE.math.gauss(this.rand), nV2 = LE.math.gauss(this.rand);
+    [s.edge, s.cloud].forEach(tw => this._plant(tw, nT, nV, nV2));
+    // EDGE twin pipeline
+    const e = s.edge;
+    if (s.peripherals.temp && !this.isExt('temperature')) this._pushTemp(e, e.meas.T);
+    if (t % 2 === 0 && s.peripherals.accel && !this.isExt('vibration')) this._pushVib(e, e.meas.V);
+    e.bytes.generated += c.bytes.tempRaw + c.bytes.vibHz * c.bytes.vibAxes * c.bytes.vibRawPerAxis;
+    if (t % c.winStep === 0 && t >= c.winLen && !this.isExt('features') && !this.isExt('inference')) this._edgeWindow(e);
+    if (t % 60 === 0) this._edgeMinute(e);
+    if (t % c.psi.everySec === 0 && !this.isExt('drift')) this._psiTick(e);
+    // CLOUD twin pipeline
+    this._cloudSecond(s.cloud);
+    // driver responses
+    [e, s.cloud].forEach(tw => { if (tw.pendingDriver && t >= tw.pendingDriver) { tw.pendingDriver = null; this._mitigate(tw); } });
+    // outcome bookkeeping
+    [e, s.cloud].forEach(tw => { tw.out.maxT = Math.max(tw.out.maxT, tw.plant.T); if (tw.plant.T > c.spoilAboveC) tw.out.secAbove++; tw.hist.temp.push(tw.meas.T); tw.hist.vib.push(tw.meas.V); });
+    if (s.peripherals.gps) s.lastGps = s.extGps && this.isExt('gps') ? s.extGps : this.route.llAt(this.route.progressAt(min));
+    if (t >= s.T) { s.done = true; if (this.linkUp()) this._flush(); this._log('sim', 'Arrived Aurangabad — trip complete'); this.emit('done', this.outcomes()); }
+    this._chipTick();
+    this.emit('tick', t);
+  }
+  run(seconds) { for (let i = 0; i < seconds && !this.s.done; i++) this.step(); return this; }
+
+  _plant(tw, nT, nV, nV2) {
+    const c = this.cfg, p = tw.plant, sp = c.setpoint, s = this.s;
+    const kf = c.failInitialRatePerMin / 60 / (c.ambient - sp), kc = c.reeferPullPerMin / 60 / 2, kd = c.doorLeakPerMin / 60 / (c.ambient - sp);
+    let dT = 0;
+    if (p.fail && !p.mitigated) dT += (c.ambient - p.T) * kf; else dT += (sp - p.T) * kc * (p.mitigated ? 2 : 1);
+    if (s.door === 'OPEN') dT += (c.ambient - p.T) * kd;
+    p.T += dT;
+    if (p.linear && !p.mitigated) p.linOff += c.linearDriftPerReading;
+    let vm = c.vibMean, vs = c.vibNoise;
+    if (p.ramp) { const f = Math.min(1, Math.max(0, (s.t - p.ramp.t0) / (p.ramp.t1 - p.ramp.t0))); vm = p.ramp.from + (p.ramp.to - p.ramp.from) * (p.ramp.frozenF ?? f); vs = c.vibNoise + 0.05 * (p.ramp.frozenF ?? f); }
+    if (p.vibStep && !p.mitigated) { vm = c.vibAnomMean; vs = c.vibAnomNoise; }
+    if (p.fail && p.mitigated) { vm = 0.05; vs = 0.01; } // compressor off, backup cooling
+    tw.meas = { T: p.T + p.linOff + nT * c.tempNoise, V: Math.max(0, vm + (tw.kind === 'edge' ? nV : nV2) * vs) };
+    if (tw.kind === 'edge' && this.isExt('temperature') && tw.extT != null) tw.meas.T = tw.extT;
+    if (tw.kind === 'edge' && this.isExt('vibration') && tw.extV != null) tw.meas.V = tw.extV;
+  }
+  _ma(arr, v) { arr.push(v); if (arr.length > this.cfg.maLen) arr.shift(); return LE.math.mean(arr); }
+  _pushTemp(tw, v) { const t = this.s.t; tw.fT.push([t, this._ma(tw.rawT, v)]); while (tw.fT.length && tw.fT[0][0] <= t - 120) tw.fT.shift(); tw.lastTempT = t; if (tw.kind === 'edge' && this.isExt('temperature')) { tw.extT = v; tw.meas && (tw.meas.T = v); } }
+  _pushVib(tw, v) { const t = this.s.t; tw.fV.push([t, this._ma(tw.rawV, v)]); while (tw.fV.length && tw.fV[0][0] <= t - 120) tw.fV.shift(); tw.lastVibT = t; if (tw.kind === 'edge' && this.isExt('vibration')) { tw.extV = v; tw.meas && (tw.meas.V = v); } }
+  _door(state, where) { const s = this.s; if (s.door === state) return; s.door = state; s.doorLog.push({ t: s.t, state, where }); s.edge.bytes.generated += this.cfg.bytes.door; this._log('door', `Door ${state} · ${where}`); this.emit('door', { t: s.t, state, where }); }
+
+  /* ---- preprocessing (mock of your preprocessing.py) ---- */
+  features(tw) {
+    const c = this.cfg, t = this.s.t, lo = t - c.winLen;
+    const T = tw.fT.filter(x => x[0] > lo), V = tw.fV.filter(x => x[0] > lo);
+    if (T.length < c.winLen * 0.6 || V.length < 5) return null;
+    const tv = T.map(x => x[1]), vv = V.map(x => x[1]);
+    return [LE.math.mean(tv), LE.math.std(tv), LE.math.slope(T.map(x => x[0]), tv) * 60,
+      Math.sqrt(LE.math.mean(vv.map(x => x * x))), Math.max(...vv), LE.math.kurtosisFisher(vv)];
+  }
+  normalise(f) {
+    const st = this.trainingStats; if (!st) return f.slice();
+    return f.map((x, i) => (x - (st.mean[i] + (this.s.shiftStats ? 3 * st.std[i] : 0))) / st.std[i]);
+  }
+  /* Mock classifier: transparent rules standing in for your MLP. Replace via LogiEdge.setClassifier(fn) or MQTT inference. */
+  mockClassify(z) {
+    const st = this.trainingStats, sp = this.cfg.setpoint;
+    const f = st ? z.map((x, i) => x * st.std[i] + st.mean[i]) : z;
+    const d = Math.abs(f[0] - sp), roc = f[2], vr = f[3], S = LE.math.sig;
+    const crit = Math.max(S((d - 3) * 3), S((vr - 0.95) * 14) * S((roc - 0.3) * 8));
+    const warn = Math.max(S((d - 1) * 3), S((vr - 0.7) * 14), S((Math.abs(roc) - 1.2) * 6));
+    let p = [(1 - crit) * (1 - warn), (1 - crit) * warn, crit];
+    const noise = this.models[this.s.model].probNoise;
+    if (noise) { p = p.map(x => Math.max(1e-4, x + LE.math.gauss(this.rand) * noise)); const sum = p.reduce((a, b) => a + b, 0); p = p.map(x => x / sum); }
+    return p;
+  }
+  _edgeWindow(tw) {
+    const f = this.features(tw);
+    if (!f) { if (!tw.faultRaised && this.s.t > 60) { tw.faultRaised = true; this._raise(tw, 'fault', 'Sensor stream missing — inference paused'); } return; }
+    tw.faultRaised = false; this._afterFeatures(tw, f, null);
+  }
+  _afterFeatures(tw, raw, norm) {
+    tw.lastFeat = raw; tw.lastZ = norm || (raw ? this.normalise(raw) : null); tw.lastFeatT = this.s.t;
+    this.emit('features', { raw: tw.lastFeat, z: tw.lastZ });
+    if (this.isExt('inference') || !tw.lastZ) return;
+    const m = this.models[this.s.model], hw = LE.HARDWARE[this.s.hw];
+    const probs = this.classifier ? this.classifier(tw.lastZ, tw.lastFeat) : this.mockClassify(tw.lastZ);
+    const lat = m.latencyMs * hw.latFactor * (1 + Math.abs(LE.math.gauss(this.rand)) * 0.15);
+    this._afterInference(tw, { cls: probs.indexOf(Math.max(...probs)), probs, latencyMs: lat, model: this.s.model, source: 'mock' });
+  }
+  _afterInference(tw, inf) {
+    const s = this.s, c = this.cfg; inf.t = s.t; tw.lastInf = inf; tw.hist.cls.push([s.t, inf.cls]);
+    if (inf.probs) tw.confs.push(c.psi.confidence === 'pNormal' ? inf.probs[0] : Math.max(...inf.probs));
+    if (tw.confs.length > 400) tw.confs.shift();
+    tw.custodyMinuteMax = Math.max(tw.custodyMinuteMax ?? 0, inf.cls);
+    if (tw.kind === 'edge') { tw.localLogBytes += c.bytes.windowRecord; tw.windowRecords = (tw.windowRecords || 0) + 1; tw.windowsThisTick = (tw.windowsThisTick || 0) + 1; tw.lastLatMs = inf.latencyMs || 0; }
+    // debounce + escalation
+    tw.seq.push(inf.cls); if (tw.seq.length > 8) tw.seq.shift();
+    const last = tw.seq.slice(-c.alertDebounce);
+    if (inf.cls > 0 && last.length === c.alertDebounce && last.every(x => x >= inf.cls) && inf.cls > tw.alertState) {
+      tw.alertState = inf.cls; this._raise(tw, inf.cls, `${LE.CLASSES[inf.cls]} — ${this._why(tw)}`);
+    }
+    if (inf.cls === 0) { tw.zeroRun++; if (tw.alertState > 0 && tw.zeroRun >= c.clearAfter) { tw.alertState = 0; this._raise(tw, 'clear', 'Back to Normal'); } } else tw.zeroRun = 0;
+    this.emit('inference', inf);
+  }
+  _why(tw) { const f = tw.lastFeat; if (!f) return 'reported by external model'; const r = []; const d = f[0] - this.cfg.setpoint; if (Math.abs(d) > 1) r.push(`cargo ${f[0].toFixed(1)} °C (${d > 0 ? '+' : ''}${d.toFixed(1)})`); if (Math.abs(f[2]) > 0.3) r.push(`rising ${f[2].toFixed(2)} °C/min`); if (f[3] > 0.7) r.push(`vibration ${f[3].toFixed(2)} g`); return r.join(', ') || 'model confidence'; }
+
+  /* ---- alerting, store-and-forward, ops centre ---- */
+  _raise(tw, cls, msg) {
+    const s = this.s, c = this.cfg;
+    const a = { id: `${tw.kind}-${tw.alerts.length + 1}`, arch: tw.kind, t: s.t, cls, msg, recvT: null };
+    tw.alerts.push(a); tw.localLogBytes += c.bytes.alert;
+    if (typeof cls === 'number' && cls > 0) {
+      if (tw.out.onset !== null && tw.out.detect === null && s.t >= tw.out.onset) tw.out.detect = s.t;
+      if (cls === 1 && tw.out.warnFirst === null) tw.out.warnFirst = s.t;
+      if (s.autoResponse && !tw.pendingDriver && tw.out.mitigationAt === null) {
+        const viaBuzzer = tw.kind === 'edge' && s.peripherals.buzzer;
+        if (viaBuzzer) tw.pendingDriver = s.t + c.driverResponseMin * 60;
+        else tw.awaitCall = true; // ops centre must phone the driver once the alert reaches it
+      }
+    }
+    this._log(tw.kind, `${typeof cls === 'number' ? '[' + LE.CLASSES[cls].toUpperCase() + '] ' : ''}${msg}`);
+    if (tw.kind === 'edge') { if (s.extOwner.alerts) { /* uplink_agent publishes what ops receives */ } else if (s.connected) this._deliver(tw, a); else { tw.queue.push({ kind: 'alert', bytes: c.bytes.alert, a }); } }
+    else this._deliver(tw, a, 0); // cloud alerts are born in the cloud
+    this.emit('alert', a);
+  }
+  _deliver(tw, a, delay) {
+    const s = this.s; a.recvT = s.t + (delay ?? this.rtt()); tw.bytes.up += tw.kind === 'edge' ? this.cfg.bytes.alert : 0;
+    s.ops.unshift({ ...a, delay: a.recvT - a.t }); if (s.ops.length > 300) s.ops.pop();
+    if (tw.awaitCall && typeof a.cls === 'number' && a.cls > 0) { if (tw.kind === 'edge' ? s.connected : this.cloudLinkUp()) { tw.awaitCall = false; tw.pendingDriver = s.t + this.cfg.driverResponseMin * 60; } }
+    this.emit('ops', a);
+  }
+  _flush() {
+    const s = this.s, tw = s.edge; if (!tw.queue.length) return;
+    const n = tw.queue.length, bytes = tw.queue.reduce((x, q) => x + q.bytes, 0);
+    tw.queue.forEach(q => { if (q.kind === 'alert') this._deliver(tw, q.a); else { q.rec.recvT = s.t; tw.bytes.up += q.bytes; } });
+    tw.queue = []; s.syncs.push({ t: s.t, n, bytes }); s.ops.unshift({ arch: 'edge', cls: 'sync', t: s.t, recvT: s.t, msg: `Store-and-forward sync: ${n} records, ${(bytes / 1024).toFixed(1)} KB`, delay: 0 });
+    this._log('edge', `Synced ${n} queued records (${bytes} B)`);
+  }
+  _edgeMinute(tw) {
+    const s = this.s, c = this.cfg, m = Math.floor(s.t / 60) - 1;
+    const has = s.peripherals.temp || this.isExt('temperature');
+    const rec = has ? { cls: tw.custodyMinuteMax ?? 0, T: tw.meas.T, recvT: null } : null;
+    tw.custodyMinuteMax = 0; tw.custody[m] = rec; if (!rec) return;
+    tw.localLogBytes += c.bytes.custodyMinute;
+    if (s.connected) { rec.recvT = s.t; tw.bytes.up += c.bytes.custodyMinute + c.bytes.heartbeat; } else tw.queue.push({ kind: 'custody', bytes: c.bytes.custodyMinute, rec });
+    if (tw.awaitCall && s.connected) { /* nothing new to deliver, call path handled in _deliver */ }
+  }
+
+  /* ---- cloud-only baseline ---- */
+  _cloudSecond(tw) {
+    const s = this.s, c = this.cfg, t = s.t, up = this.cloudLinkUp();
+    tw.bytes.generated += c.bytes.tempRaw + c.bytes.vibHz * c.bytes.vibAxes * c.bytes.vibRawPerAxis;
+    if (up) { tw.cloudRx.push({ ts: t, arr: t + this.rtt(), v: tw.meas.T }); tw.bytes.up += c.bytes.cloudTempMsg; } else { tw.lost++; tw.droppedBytes = (tw.droppedBytes || 0) + c.bytes.cloudTempMsg; }
+    while (tw.cloudRx.length && tw.cloudRx[0].ts < t - 120) tw.cloudRx.shift();
+    if (t % 60 === 0) { const m = Math.floor(t / 60) - 1; const got = tw.cloudRx.filter(r => r.ts > t - 60 && r.arr <= t + 5); tw.custody[m] = got.length ? { cls: tw.custodyMinuteMax ?? 0, T: LE.math.mean(got.map(r => r.v)), recvT: t } : null; tw.custodyMinuteMax = 0; }
+    if (t % (c.manualLogEveryMin * 60) === 0) { tw.manual.push({ t, T: tw.meas.T }); }
+    if (t % c.winStep === 0 && t >= c.winLen) {
+      const w = tw.cloudRx.filter(r => r.ts > t - c.winLen && r.arr <= t);
+      if (w.length >= c.winLen * 0.6) {
+        const d = Math.abs(LE.math.mean(w.map(r => r.v)) - c.setpoint); const cls = d > 3 ? 2 : d > 1 ? 1 : 0;
+        this._afterInferenceCloud(tw, cls);
+      }
+    }
+    if (tw.awaitCall && up) { tw.awaitCall = false; tw.pendingDriver = t + c.driverResponseMin * 60; }
+  }
+  _afterInferenceCloud(tw, cls) {
+    const c = this.cfg; tw.lastInf = { t: this.s.t, cls, probs: null, source: 'cloud rules' }; tw.hist.cls.push([this.s.t, cls]);
+    tw.custodyMinuteMax = Math.max(tw.custodyMinuteMax ?? 0, cls);
+    tw.seq.push(cls); if (tw.seq.length > 8) tw.seq.shift();
+    const last = tw.seq.slice(-c.alertDebounce);
+    if (cls > 0 && last.length === c.alertDebounce && last.every(x => x >= cls) && cls > tw.alertState) { tw.alertState = cls; this._raise(tw, cls, `${LE.CLASSES[cls]} — cloud saw cargo off setpoint`); }
+    if (cls === 0) { tw.zeroRun++; if (tw.alertState > 0 && tw.zeroRun >= c.clearAfter) { tw.alertState = 0; this._raise(tw, 'clear', 'Back to Normal'); } } else tw.zeroRun = 0;
+  }
+  _mitigate(tw) {
+    const p = tw.plant, s = this.s;
+    const active = p.fail || p.linear || p.vibStep || (p.ramp && p.ramp.frozenF === undefined);
+    if (!active) { this._log(tw.kind, 'Driver checked the reefer — no fault found'); return; }
+    tw.out.mitigationAt = s.t;
+    if (p.ramp && !p.fail) { p.ramp.frozenF = 0.1; p.mitigated = true; this._log(tw.kind, 'Maintenance booked at next depot — compressor load reduced, seizure avoided'); return; }
+    p.mitigated = true; this._log(tw.kind, p.fail ? 'Driver switched to backup cooling' : 'Driver corrected the reefer setting');
+  }
+
+  /* ---- chip compute + power model (estimates; tune in LE.HARDWARE) ---- */
+  _chipTick() {
+    const s = this.s, hw = LE.HARDWARE[s.hw], tw = s.edge, c = this.cfg;
+    const upNow = tw.bytes.up, txB = upNow - (this._lastUp || 0); this._lastUp = upNow;
+    const w = tw.windowsThisTick || 0; tw.windowsThisTick = 0;
+    const busyMs = hw.sampleMs + w * (hw.featMs + (tw.lastLatMs || 0)) + txB / 1024 * hw.txMsPerKB * 1000 / 1000;
+    const cpu = Math.min(100, hw.basePct + busyMs / 10);
+    const modem = !s.peripherals.modem ? 'off' : txB > 0 ? 'tx' : s.connected ? 'idle' : 'searching';
+    const mw = modem === 'off' ? 0 : c.modemW[modem];
+    const power = hw.idleW + (hw.tdpW - hw.idleW) * (cpu - hw.basePct) / 100 + mw;
+    s.chip = { cpu, power, modem, txB, windows: w };
+    s.cpuHist.push(cpu); s.powHist.push(power); if (s.cpuHist.length > 600) { s.cpuHist.shift(); s.powHist.shift(); }
+  }
+
+  /* ---- PSI drift ---- */
+  _psiTick(tw) {
+    if (!this.referenceDist || tw.confs.length < 20) return;
+    const recent = tw.confs.slice(-this.cfg.psi.rolling);
+    this._psiPoint(LE.math.psi(this.referenceDist, LE.math.bins4(recent)), 'mock', LE.math.bins4(recent));
+  }
+  _psiPoint(v, source, bins) {
+    const s = this.s; s.psiHist.push([s.t, v]); if (s.psiHist.length > 2000) s.psiHist.shift(); s.psiBins = bins || s.psiBins;
+    if (v > this.cfg.psi.alertAt) { const msg = `[LOGIBRIDGE DRIFT ALERT] PSI=${v.toFixed(3)}`; s.driftAlerts.push({ t: s.t, v }); this._log('drift', msg); }
+    this.emit('psi', { t: s.t, v, source });
+  }
+
+  /* ---- derived views ---- */
+  memory() {
+    const s = this.s, hw = LE.HARDWARE[s.hw], m = this.models[s.model], c = this.cfg, tw = s.edge, mcu = s.hw === 'stm32';
+    const qB = tw.queue.reduce((x, q) => x + q.bytes, 0) / 1024;
+    const ram = [
+      { k: mcu ? 'RTOS + stacks + drivers' : 'OS + Docker + Python runtime', kb: hw.ram.baseKB },
+      { k: 'Raw vibration DMA buffer (1 s, 3-axis)', kb: c.bytes.vibHz * c.bytes.vibAxes * c.bytes.vibRawPerAxis * 2 / 1024 },
+      { k: 'Filter + window rings (temp, vib)', kb: ((c.winLen + c.maLen) * 2 + (c.winLen / 2 + c.maLen) * 2) * 4 / 1024 * (mcu ? 1 : 8) },
+      { k: mcu ? 'Model weights (executed from flash)' : 'Model weights (loaded)', kb: mcu ? 0 : m.sizeKB },
+      { k: 'Tensor arena / activations', kb: m.arenaKB },
+      { k: mcu ? 'MQTT-SN client buffers' : 'Mosquitto broker + client', kb: mcu ? 16 : 6 * 1024 },
+      { k: 'Store-and-forward queue (RAM part)', kb: mcu ? Math.min(qB, 128) : Math.min(qB, 64 * 1024) },
+    ];
+    const store = [
+      { k: mcu ? 'Firmware image' : 'OS image + container layers', kb: hw.store.baseKB },
+      { k: 'Model file', kb: m.sizeKB },
+      { k: 'Local alert + custody log', kb: tw.localLogBytes / 1024 },
+      { k: 'Queue spill to flash', kb: mcu ? Math.max(0, qB - 128) : 0 },
+    ];
+    const sum = a => a.reduce((x, y) => x + y.kb, 0);
+    return { ram, store, ramUsed: sum(ram), storeUsed: sum(store), ramTotal: hw.ram.totalKB, storeTotal: hw.store.totalKB, ramLabel: hw.ram.label, storeLabel: hw.store.label, queueKB: qB, fits: sum(ram) <= hw.ram.totalKB && sum(store) <= hw.store.totalKB };
+  }
+  dataAgeSec(tw) { const t = this.s.t; for (let m = Math.floor(t / 60) - 1; m >= 0; m--) { const r = tw.custody[m]; if (r && r.recvT !== null && r.recvT <= t) return t - (m + 1) * 60; } return t; }
+  custodyPct(tw) { const n = Math.floor(this.s.t / 60); if (!n) return 100; let ok = 0; for (let i = 0; i < n; i++) if (tw.custody[i] && tw.custody[i].recvT !== null && tw.custody[i].recvT <= this.s.t) ok++; return 100 * ok / n; }
+  outcomes() {
+    const s = this.s, c = this.cfg;
+    const o = tw => { const out = tw.out; const minAbove = out.secAbove / 60; const det = out.detect !== null && out.onset !== null ? out.detect - out.onset : null;
+      return { onset: out.onset, detect: out.detect, detectLatencySec: det, slaMet: det !== null ? det <= 90 : null, maxT: out.maxT, minutesAbove: minAbove,
+        cargo: minAbove > c.spoilMinutes ? 'Spoiled' : 'Saved', loss: minAbove > c.spoilMinutes ? c.cargoValueINR : 0, breakdown: out.breakdown, warnFirst: out.warnFirst,
+        custodyPct: this.custodyPct(tw), upMB: tw.bytes.up / 1048576, genMB: tw.bytes.generated / 1048576, costINR: tw.bytes.up / 1048576 * c.costPerMB, lost: tw.lost, alerts: tw.alerts.filter(a => typeof a.cls === 'number').length,
+        verdict: this.custodyPct(tw) >= c.custodyAcceptPct ? 'Accepted' : 'Rejected' }; };
+    return { edge: o(s.edge), cloud: o(s.cloud) };
+  }
+}
+LE.Sim = Sim;
+
+/* ---------- 6. Bootstrap training stats + PSI reference from clean Normal data (mirrors C2 / E1) ---------- */
+LE.bootstrapStats = function (seed = 7) {
+  const sim = new Sim({ bootstrap: true, seed, config: { deadZones: [] } }); const feats = [];
+  sim.on('features', d => d.raw && feats.push(d.raw));
+  sim.run(600); // 10 minutes of clean Normal output
+  const mean = LE.FEATURES.map((_, i) => LE.math.mean(feats.map(f => f[i])));
+  const std = LE.FEATURES.map((_, i) => Math.max(1e-6, LE.math.std(feats.map(f => f[i]))));
+  const stats = { mean, std, n: feats.length };
+  const sim2 = new Sim({ seed: seed + 1, trainingStats: stats, config: { deadZones: [] } }); const confs = [];
+  sim2.on('inference', inf => inf.probs && confs.push(Math.max(...inf.probs)));
+  sim2.run(3000 + 30); // 300 windows
+  const sim3 = new Sim({ seed: seed + 1, trainingStats: stats, config: { deadZones: [] } }); const pn = [];
+  sim3.on('inference', inf => inf.probs && pn.push(inf.probs[0])); sim3.run(3030);
+  return { stats, refMax: LE.math.bins4(confs.slice(0, 300)), refPNormal: LE.math.bins4(pn.slice(0, 300)), windows: confs.length };
+};
+
+if (typeof module !== 'undefined') module.exports = LE;
+
+/* =====================================================================
+   LogiEdge simulator — SELF-TESTS
+   Runs on fresh Sim instances (never disturbs the live one), plus a few
+   checks that the live UI and API are wired. Add your own with t('name', fn).
+   ===================================================================== */
+LE.runSelfTests = function () {
+  const results = [], t0 = (typeof performance !== 'undefined' ? performance : Date).now();
+  const t = (name, fn) => { try { fn(); results.push({ name, ok: true }); } catch (e) { results.push({ name, ok: false, err: e.message }); } };
+  const ok = (cond, msg) => { if (!cond) throw new Error(msg); };
+  const near = (a, b, tol, msg) => ok(Math.abs(a - b) <= tol, `${msg}: got ${a}, expected ${b}±${tol}`);
+  const boot = LE._bootCache || (LE._bootCache = LE.bootstrapStats());
+  const mk = (scenario = 'free', extra = {}) => { const s = new LE.Sim({ scenario, trainingStats: boot.stats, referenceDist: boot.refPNormal, ...extra }); return s; };
+
+  // --- maths and preprocessing ---
+  t('PSI of identical distributions is 0', () => near(LE.math.psi([.25, .25, .25, .25], [.25, .25, .25, .25]), 0, 1e-12, 'psi'));
+  t('PSI known example ≈ 0.228', () => near(LE.math.psi([.25, .25, .25, .25], [.1, .2, .3, .4]), 0.2282, 0.001, 'psi'));
+  t('Confidence bins: 0.25 → bin 2, 1.0 → bin 4', () => { const b = LE.math.bins4([0.25, 1.0]); ok(b[1] === 0.5 && b[3] === 0.5, JSON.stringify(b)); });
+  t('Fisher kurtosis of a symmetric two-point set is −2', () => near(LE.math.kurtosisFisher([1, -1, 1, -1]), -2, 1e-9, 'kurtosis'));
+  t('Features: 30 s window yields 6 values with correct slope', () => {
+    const s = mk(); const tw = s.s.edge; s.s.t = 100;
+    for (let k = 71; k <= 100; k++) tw.fT.push([k, 4 + (k - 71) * 0.01]); for (let k = 72; k <= 100; k += 2) tw.fV.push([k, 0.5]);
+    const f = s.features(tw); ok(f && f.length === 6, 'no feature vector'); near(f[2], 0.6, 1e-6, 'temp_roc °C/min'); near(f[3], 0.5, 1e-9, 'vib_rms'); near(f[4], 0.5, 1e-9, 'vib_peak');
+  });
+  t('Training stats come from ~10 min of clean Normal windows', () => { ok(boot.stats.n >= 55 && boot.stats.n <= 60, 'windows=' + boot.stats.n); near(boot.stats.mean[0], 4, 0.15, 'temp_mean'); });
+  t('3σ-shifted stats push z of a normal window to about −3', () => { const s = mk(); s.s.shiftStats = true; const z = s.normalise(boot.stats.mean); z.forEach(v => near(v, -3, 1e-9, 'z')); });
+  t('Mock classifier: Normal features → class 0, breach → class 2', () => {
+    const s = mk(); const pN = s.mockClassify(s.normalise(boot.stats.mean)); ok(pN.indexOf(Math.max(...pN)) === 0, 'normal ' + pN);
+    const hot = boot.stats.mean.slice(); hot[0] = 9; const pC = s.mockClassify(s.normalise(hot)); ok(pC.indexOf(Math.max(...pC)) === 2, 'breach ' + pC);
+    pN.concat(pC).forEach(p => ok(p >= 0 && p <= 1, 'prob out of range'));
+  });
+
+  // --- connectivity and store-and-forward ---
+  t('Clean 30 min run raises no alerts', () => { const s = mk('free', { config: { deadZones: [] } }); s.run(1800); ok(s.s.edge.alerts.length === 0, s.s.edge.alerts.map(a => a.msg).join('; ')); });
+  t('Offline: edge alert is queued, then synced with delay on reconnect', () => {
+    const s = mk(); s.run(120); s.setLink('off'); s.run(5); s.setAnomaly('combined'); s.run(120);
+    ok(s.s.edge.alerts.some(a => a.cls === 2), 'no critical alert'); ok(s.s.edge.queue.some(q => q.kind === 'alert'), 'alert not queued');
+    ok(!s.s.ops.some(o => o.arch === 'edge' && o.cls === 2), 'ops got it while offline');
+    s.setLink('on'); s.run(2); const o = s.s.ops.find(o => o.arch === 'edge' && o.cls === 2); ok(o && o.delay > 60, 'not synced or no delay'); ok(s.s.edge.queue.length === 0, 'queue not drained');
+  });
+  t('Cloud-only drops samples in a signal gap', () => { const s = mk(); s.run(40 * 60 + 600); ok(s.s.cloud.lost >= 590, 'lost=' + s.s.cloud.lost); ok(s.s.edge.custody[45] && s.s.cloud.custody[45] === null, 'custody gap missing'); });
+
+  // --- the three incidents ---
+  t('Incident 1: edge detects reefer failure within the 90 s SLA', () => { const s = mk('s1'); s.run(300 * 60); const o = s.outcomes().edge; ok(o.detectLatencySec !== null && o.detectLatencySec <= 90, 'latency=' + o.detectLatencySec); });
+  t('Incident 1: cloud-only spoils the cargo, edge saves it', () => { const s = mk('s1'); s.run(s.s.T); const o = s.outcomes(); ok(o.cloud.cargo === 'Spoiled', 'cloud ' + o.cloud.cargo); ok(o.edge.cargo === 'Saved', 'edge ' + o.edge.cargo); });
+  t('Incident 2: edge record accepted, cloud-only rejected at handover', () => { const s = mk('s2'); s.run(s.s.T); const o = s.outcomes(); ok(o.edge.verdict === 'Accepted', 'edge ' + o.edge.custodyPct); ok(o.cloud.verdict === 'Rejected', 'cloud ' + o.cloud.custodyPct); });
+  t('Incident 3: edge warns ≥ 1 h before seizure, cloud-only breaks down', () => { const s = mk('s3'); s.run(s.s.T); const o = s.outcomes(); ok(o.edge.warnFirst !== null && 460 * 60 - o.edge.warnFirst >= 3600, 'lead=' + o.edge.warnFirst); ok(!o.edge.breakdown, 'edge broke down'); ok(o.cloud.breakdown, 'cloud did not break down'); });
+  t('Buzzer unplugged: driver acts only after the alert reaches ops', () => { const s = mk('s1'); s.setPeripheral('buzzer', false); s.run(s.s.T); const m = s.s.edge.out.mitigationAt; ok(m !== null && m >= 360 * 60, 'mitigation at ' + m); });
+
+  // --- hardware, models, peripherals ---
+  t('Model switch on Pi: only the model layer is rebuilt', () => { const s = mk(); s.setModel('M3'); const ev = s.s.ota[0]; ok(ev && ev.docker, 'no docker OTA'); ok(ev.layers.filter(l => !l.cached).every(l => /model|MODEL/.test(l.cmd)), 'non-model layer rebuilt'); });
+  t('STM32 node: no Docker, 1 MB SRAM, current model fits', () => { const s = mk(); s.setHardware('stm32'); s.setModel('M1'); const m = s.memory(); ok(m.ramTotal === 1024, 'ram ' + m.ramTotal); ok(!s.s.ota[0].docker, 'docker on MCU'); ok(m.fits, 'does not fit'); });
+  t('Queue grows in a signal gap and shows in memory', () => { const s = mk(); s.setLink('off'); s.run(900); ok(s.memory().queueKB > 0.5, 'queue ' + s.memory().queueKB); });
+  t('Chip model: compute spikes on inference windows, power within budget on Pi', () => { const s = mk(); s.run(29); const idle = s.s.chip.cpu; s.run(1); ok(s.s.chip.windows === 1 && s.s.chip.cpu > idle, 'no spike'); ok(s.s.chip.power < s.cfg.aiPowerBudgetW, 'power ' + s.s.chip.power); });
+  t('Jetson TDP exceeds the 10 W budget, STM32 stays far below', () => { ok(LE.HARDWARE.jetson.tdpW > LE.CONFIG.aiPowerBudgetW && LE.HARDWARE.stm32.tdpW < 1, 'catalogue'); });
+  t('Local storage grows every window; sync event reports records and bytes', () => { const s = mk(); s.run(100); const b0 = s.s.edge.localLogBytes; s.run(50); ok(s.s.edge.localLogBytes > b0, 'no local writes'); s.setLink('off'); s.run(300); s.setLink('on'); s.run(2); const sy = s.s.syncs[s.s.syncs.length - 1]; ok(sy && sy.n > 0 && sy.bytes > 0, 'no sync event'); });
+  t('Data age at ops grows during a gap and resets after sync', () => { const s = mk(); s.run(600); s.setLink('off'); s.run(1200); ok(s.dataAgeSec(s.s.edge) >= 1140, 'age ' + s.dataAgeSec(s.s.edge)); s.setLink('on'); s.run(61); ok(s.dataAgeSec(s.s.edge) <= 61, 'after sync ' + s.dataAgeSec(s.s.edge)); });
+  t('Temperature probe unplugged → sensor-fault alert', () => { const s = mk(); s.run(60); s.setPeripheral('temp', false); s.run(130); ok(s.s.edge.alerts.some(a => a.cls === 'fault'), 'no fault alert'); });
+
+  // --- external data takes over ---
+  t('External inference replaces the mock model', () => { const s = mk(); s.run(40); s.ext('inference', { class: 2, probs: [.05, .05, .9], latency_ms: 1, model: 'M2' }); ok(s.s.edge.lastInf.source === 'external', 'source'); s.run(3); ok(s.s.edge.lastInf.source === 'external', 'mock overwrote it'); });
+  t('External temperature suppresses the mock stream, mock resumes after timeout', () => { const s = mk(); s.run(10); s.ext('temperature', { value: 7.5 }); ok(s.isExt('temperature'), 'not external'); s.run(LE.CONFIG.externalTimeoutSec + 1); ok(!s.isExt('temperature'), 'still external'); });
+  t('PSI crosses 0.25 within 5 min of combined drift, drops below 0.10 after', () => {
+    const s = mk('free', { config: { deadZones: [] } }); s.run(1800); s.setAnomaly('combined'); const tInj = s.s.t; s.run(300);
+    const crossed = s.s.psiHist.find(p => p[0] > tInj && p[1] > 0.25); ok(crossed, 'never crossed'); s.setAnomaly('none'); s.run(1800);
+    const last = s.s.psiHist[s.s.psiHist.length - 1][1]; ok(last < 0.10, 'after recovery PSI=' + last.toFixed(3));
+  });
+
+  t('External node, storage, sync, alerts, model and status messages are applied', () => {
+    const s = mk(); s.run(60);
+    s.ext('node', { cpu_pct: 12.5, power_w: 3.3, power_src: 'estimate' }); ok(s.s.extNode.cpu === 12.5 && s.isExt('node'), 'node');
+    s.ext('storage', { stored_bytes: 5000, queued_bytes: 300, queued_records: 6, sent_bytes: 4700 }); ok(s.s.extStorage.queued === 300, 'storage');
+    const n0 = s.s.syncs.length; s.ext('sync', { records: 6, bytes: 300, gap_s: 600 }); ok(s.s.syncs.length === n0 + 1, 'sync');
+    s.ext('alerts', { class: 2, msg: 'Critical test', ts: 1000, raised_ts: 400 }); const a = s.s.ops[0]; ok(a.ext && a.delay === 600 && s.s.extOwner.alerts, 'alert');
+    s.ext('model_active', { model: 'M3', size_kb: 180 }); ok(s.s.model === 'M3' && s.models.M3.sizeKB === 180, 'model');
+    s.ext('status', { online: false, _service: 'preprocessing' }); ok(s.s.services.preprocessing && !s.s.services.preprocessing.online, 'status');
+  });
+  t('External sensor values are what the edge twin displays', () => { const s = mk(); s.run(10); s.setAnomaly('combined'); s.ext('vibration', { value: 0.47 }); s.run(1); ok(Math.abs(s.s.edge.meas.V - 0.47) < 1e-9, 'shows mock ' + s.s.edge.meas.V); });
+  t('Link echo from the uplink agent never overrides the route (no deadlock)', () => { const s = mk(); s.run(40 * 60 + 5); ok(!s.s.connected, 'should be in gap 1'); s.ext('link', { cellular: false }); s.run(36 * 60); ok(s.s.connected, 'route did not restore signal'); });
+  t('Uplink agent owning alerts suppresses the mock edge alert path', () => { const s = mk(); s.ext('status', { online: true, _service: 'uplink_agent' }); s.run(60); s.setAnomaly('combined'); s.run(120); ok(s.s.edge.alerts.length > 0 && !s.s.ops.some(o => o.arch === 'edge' && !o.ext && typeof o.cls === 'number'), 'mock alert leaked to ops'); });
+
+  // --- live UI and API (browser only) ---
+  if (typeof document !== 'undefined' && window.LogiEdge) {
+    const API = window.LogiEdge; const keepContract = JSON.stringify(API._ui.contract);
+    t('API: all public methods present', () => ['push', 'setModelMetrics', 'loadBenchmarkCSV', 'setTrainingStats', 'setReferenceDist', 'setClassifier', 'on', 'runSelfTests'].forEach(k => ok(typeof API[k] === 'function', k)));
+    t('API: status topic name is taken from the last topic segment', () => { ok(API.push('status', { online: true }, 'logibridge/trucks/X/status/selftest_svc') && API.sim.s.services.selftest_svc, 'not parsed'); delete API.sim.s.services.selftest_svc; });
+    t('API: payload validation rejects bad messages', () => { ok(API.push('inference', { class: 7 }) === false, 'accepted class 7'); ok(API.push('door', { state: 'AJAR' }) === false, 'accepted AJAR'); });
+    t('API: benchmark CSV updates model metrics', () => { const keep = JSON.stringify(API.sim.models.M2); API.loadBenchmarkCSV('variant,mean_latency_ms,size_kb,accuracy,class2_recall\nM2,0.8,276,93.4,97.1'); ok(API.sim.models.M2.sizeKB === 276 && API.sim.models.M2.recallC2 === 97.1, 'not applied'); API.sim.models.M2 = JSON.parse(keep); });
+    t('UI: chip and model buttons on the main screen switch the sim', () => { API.setView('edge'); const keepHw = API.sim.s.hw, keepM = API.sim.s.model; document.querySelector('#fcHwSeg [data-hw=stm32]').click(); ok(API.sim.s.hw === 'stm32', 'hw not switched'); document.querySelector('#fcModelSeg [data-m=M3]').click(); ok(API.sim.s.model === 'M3', 'model not switched'); ok(document.querySelector('#fcModelSeg [data-m=M3]').classList.contains('on'), 'button not highlighted'); API.sim.setHardware(keepHw); API.sim.setModel(keepM); API.render(); });
+    t('UI: single-screen stage shows chip, storage, link and backend', () => { ['fcCpu', 'fcPow', 'fcMem', 'fcProbs', 'fcLat', 'fstBig', 'fbBig', 'cC'].forEach(id => ok(document.getElementById(id), id + ' missing')); ok(!API._ui.details || true, ''); });
+    t('UI: every panel renders without errors', () => { const wasOpen = API._ui.details; API.openDetails(true); ['hw', 'mem', 'models', 'drift', 'int', 'log'].forEach(tab => { API._ui.tab = tab; API.render(); }); API._ui.tab = 'test'; ['cloud', 'edge'].forEach(v => API.setView(v)); API.openDetails(wasOpen); ok(document.getElementById('score').rows.length > 3, 'scoreboard empty'); ok(document.getElementById('map').querySelector('#truck'), 'truck missing'); });
+    const c = API._ui.contract; Object.keys(c).forEach(k => delete c[k]); Object.assign(c, JSON.parse(keepContract)); // tests must not pollute the live contract monitor
+  }
+  const passed = results.filter(r => r.ok).length;
+  return { passed, failed: results.length - passed, results, ms: (typeof performance !== 'undefined' ? performance : Date).now() - t0 };
+};
+if (typeof module !== 'undefined') module.exports = LE;
+
+/* =====================================================================
+   LogiEdge simulator — UI layer
+   Reads sim.s (state) and draws. Never holds simulation logic itself.
+   ===================================================================== */
+(function () {
+const $ = id => document.getElementById(id);
+const C = { edge: '#0E6A87', cloud: '#82569A', ok: '#2E8455', warn: '#C98A12', crit: '#C2352B', dead: '#9AA7AE', steel: '#8DA1AC', ink: '#16242E', grid: '#E3EAED' };
+const clsColor = c => c === 2 ? C.crit : c === 1 ? C.warn : C.ok;
+const fmtT = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`; };
+const fmtDur = s => s == null ? '–' : s < 120 ? `${Math.round(s)} s` : s < 7200 ? `${(s / 60).toFixed(0)} min` : `${(s / 3600).toFixed(1)} h`;
+const kb = v => v >= 1048576 ? (v / 1048576).toFixed(2) + ' GB' : v >= 1024 ? (v / 1024).toFixed(1) + ' MB' : v.toFixed(1) + ' KB';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- boot ---------- */
+const boot = LE.bootstrapStats();
+let refs = { max: boot.refMax, pNormal: boot.refPNormal };
+const UI = { view: 'edge', details: false, prev: null, active: {}, lastFloat: {}, pend: {}, syncShownUntil: 0, running: false, speed: 180, acc: 0, last: 0, lastRender: 0, tab: 'hw', extSeen: {}, contract: {} };
+let sim;
+function newSim(scenario = 'free') {
+  const prev = sim;
+  sim = new LE.Sim({ scenario, trainingStats: prev ? prev.trainingStats : boot.stats, referenceDist: null });
+  if (prev) { sim.models = prev.models; sim.classifier = prev.classifier; sim.cfg.psi.confidence = prev.cfg.psi.confidence; sim.s.hw = prev.s.hw; sim.s.model = prev.s.model; sim.s.peripherals = { ...prev.s.peripherals }; sim.referenceDist = prev.referenceDist; }
+  if (!sim.referenceDist) sim.referenceDist = refs[sim.cfg.psi.confidence];
+  sim.on('external', d => { UI.extSeen[d.stream] = Date.now(); });
+  sim.on('link', up => mqttPublishControl({ cellular: up }));
+  window.LogiEdge && (window.LogiEdge.sim = sim);
+  $('autoResp').checked = sim.s.autoResponse; $('shiftStats').checked = sim.s.shiftStats;
+  buildMapStatic(); buildFlow(); UI.prev = null; renderAll(true);
+}
+
+/* ---------- header controls ---------- */
+$('truckId').textContent = LE.CONFIG.truckId;
+Object.entries(LE.SCENARIOS).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v.title; $('scenario').appendChild(o); });
+$('scenario').onchange = e => { UI.running = false; newSim(e.target.value); };
+document.querySelectorAll('#viewSeg button').forEach(b => b.onclick = () => { UI.view = b.dataset.v; buildFlow(); UI.prev = null; renderAll(true); });
+$('play').onclick = () => { UI.running = !UI.running; if (sim.s.done) { newSim(sim.s.scenario); UI.running = true; } renderHeader(); };
+$('stepBtn').onclick = () => { sim.run(10); renderAll(true); };
+$('resetBtn').onclick = () => { UI.running = false; newSim(sim.s.scenario); };
+$('speed').onchange = e => UI.speed = +e.target.value;
+['none', 'temp_drift', 'vibration', 'combined'].forEach(m => { const b = document.createElement('button'); b.className = 'btn' + (m !== 'none' ? ' danger' : ''); b.textContent = m; b.dataset.m = m; b.onclick = () => { sim.setAnomaly(m); mqttPublishControl({ anomaly: m }); renderAll(true); }; $('anomBtns').appendChild(b); });
+[['auto', 'Follow route'], ['on', 'Force on'], ['off', 'Force off']].forEach(([m, l]) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = l; b.dataset.m = m; b.onclick = () => { sim.setLink(m); renderAll(true); }; $('linkBtns').appendChild(b); });
+$('autoResp').onchange = e => sim.s.autoResponse = e.target.checked;
+$('shiftStats').onchange = e => { sim.s.shiftStats = e.target.checked; sim._log('sim', `Normalisation stats ${e.target.checked ? 'shifted by +3σ' : 'restored'}`); };
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { UI.tab = b.dataset.t; document.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-selected', x === b)); document.querySelectorAll('.tabpane').forEach(p => p.classList.toggle('on', p.id === 'tab-' + UI.tab)); renderAll(true); });
+
+/* ---------- map ---------- */
+const proj = ll => [20 + (ll[1] - 73.65) / (75.45 - 73.65) * 960, 30 + (20.16 - ll[0]) / (20.16 - 19.62) * 240];
+const pathBetween = (p0, p1, n = 40) => { const pts = []; for (let i = 0; i <= n; i++) pts.push(proj(sim.route.llAt(p0 + (p1 - p0) * i / n))); return pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' '); };
+function buildMapStatic() {
+  const svg = $('map'), r = sim.route, c = sim.cfg;
+  let h = `<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="6" fill="${C.dead}"/></pattern></defs>`;
+  h += `<polyline points="${pathBetween(0, 1, 200)}" fill="none" stroke="#D3DDE2" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>`;
+  c.deadZones.forEach(([a, d], i) => { const p0 = r.progressAt(a), p1 = r.progressAt(a + d); h += `<polyline points="${pathBetween(p0, p1, 20)}" fill="none" stroke="url(#hatch)" stroke-width="22" stroke-linecap="butt" opacity=".9"><title>Signal gap ${i + 1}: ${d} min from minute ${a}</title></polyline>`; const mid = proj(r.llAt((p0 + p1) / 2)); h += `<text x="${mid[0]}" y="${mid[1] + 30}" text-anchor="middle" font-size="12" fill="${C.steel}" font-family="Barlow Semi Condensed,sans-serif">gap ${i + 1} · ${d} min</text>`; });
+  h += `<polyline id="covered" points="" fill="none" stroke="${C.edge}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  r.pts.forEach((p, i) => { const [x, y] = proj(p.ll); h += `<circle cx="${x}" cy="${y}" r="5" fill="#fff" stroke="${C.ink}" stroke-width="2"/><text x="${x}" y="${y - 14}" text-anchor="middle" font-size="15" font-weight="600" fill="${C.ink}">${p.name}</text>`; });
+  c.stops.forEach(s => { const [x, y] = proj(r.llAt(r.progressAt(s.start))); h += `<circle cx="${x}" cy="${y}" r="9" fill="none" stroke="${C.warn}" stroke-width="3"><title>${esc(s.name)} · minute ${s.start}, ${s.dur} min</title></circle>`; });
+  h += `<g id="truck"><circle r="13" fill="${C.ok}" stroke="#fff" stroke-width="3"/><path d="M-6,-3 h8 v6 h-8z M2,-1 h3 l2,2 v2 h-5z" fill="#fff"/><g id="truckLabel" transform="translate(18,-8)"><rect x="0" y="-14" rx="4" width="112" height="40" fill="#fff" stroke="${C.line || '#C9D5DB'}"/><text id="tl1" x="8" y="2" font-size="14" font-weight="600" fill="${C.ink}"></text><text id="tl2" x="8" y="19" font-size="12" fill="#5A6A75"></text></g></g>`;
+  svg.innerHTML = h;
+  $('routeInfo').textContent = `${sim.route.totalKm.toFixed(0)} km · ${c.tripMinutes / 60} h trip · ${c.deadZones.length} signal gaps`;
+}
+function renderMap() {
+  const r = sim.route, p = r.progressAt(sim.s.t / 60);
+  $('covered').setAttribute('points', pathBetween(0, Math.max(0.0001, p), Math.max(2, Math.round(p * 200))));
+  const [x, y] = proj(sim.s.lastGps), tw = UI.view === 'cloud' ? sim.s.cloud : sim.s.edge;
+  const cls = UI.view === 'cloud' ? (tw.alertState || 0) : (tw.lastInf ? tw.lastInf.cls : 0);
+  $('truck').setAttribute('transform', `translate(${x},${y})`);
+  $('truck').querySelector('circle').setAttribute('fill', sim.s.peripherals.gps ? clsColor(cls) : C.steel);
+  $('tl1').textContent = `${(tw.meas ? tw.meas.T : 4).toFixed(1)} °C · ${LE.CLASSES[cls]}`;
+  $('tl2').textContent = (sim.s.connected ? 'cellular up' : 'no signal') + (sim.s.peripherals.gps ? '' : ' · GPS off');
+  $('truckLabel').setAttribute('transform', x > 840 ? 'translate(-130,-8)' : 'translate(18,-8)');
+}
+
+/* ---------- custody ribbons ---------- */
+function ribbon(cv, tw, isEdge) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = 22; cv.width = w * dpr; cv.height = h * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const N = sim.cfg.tripMinutes, cw = w / N, now = sim.s.t, nm = Math.floor(now / 60);
+  g.fillStyle = '#F3F6F7'; g.fillRect(0, 0, w, h);
+  sim.cfg.deadZones.forEach(([a, d]) => { g.fillStyle = '#E3E9EC'; g.fillRect(a * cw, 0, d * cw, 3); });
+  for (let m = 0; m < nm; m++) {
+    const rec = tw.custody[m], x = m * cw;
+    if (!rec) { g.fillStyle = '#C9D2D7'; for (let k = 0; k < cw + h; k += 4) { g.fillRect(x + (k % Math.max(1, cw)), 5, 1, h - 5); } continue; }
+    const atOps = rec.recvT !== null && rec.recvT <= now;
+    g.fillStyle = clsColor(rec.cls); g.globalAlpha = atOps ? 0.9 : 0.25; g.fillRect(x, 5, Math.max(1, cw + 0.3), h - 5); g.globalAlpha = 1;
+  }
+  if (!isEdge) tw.manual.forEach(e => { g.fillStyle = C.ink; g.fillRect(e.t / 60 * cw - 1, 0, 2, h); });
+  g.fillStyle = C.ink; g.fillRect(nm * cw, 0, 1.5, h);
+}
+
+/* ---------- small canvas line chart ---------- */
+function chart(cv, o) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; cv.width = w * dpr; cv.height = h * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  const L = 34, R = 6, T = 6, B = 16, pw = w - L - R, ph = h - T - B, y = v => T + ph - (v - o.min) / (o.max - o.min) * ph;
+  g.font = '11px Barlow Semi Condensed, sans-serif'; g.fillStyle = '#5A6A75'; g.strokeStyle = C.grid; g.lineWidth = 1;
+  (o.bands || []).forEach(b => { g.fillStyle = b.c; g.fillRect(L, y(b.hi), pw, y(b.lo) - y(b.hi)); });
+  (o.ticks || []).forEach(v => { g.strokeStyle = C.grid; g.beginPath(); g.moveTo(L, y(v)); g.lineTo(L + pw, y(v)); g.stroke(); g.fillStyle = '#5A6A75'; g.fillText(String(v), 2, y(v) + 4); });
+  (o.lines || []).forEach(l => { g.strokeStyle = l.c; g.setLineDash(l.dash || []); g.beginPath(); g.moveTo(L, y(l.v)); g.lineTo(L + pw, y(l.v)); g.stroke(); g.setLineDash([]); });
+  (o.shade || []).forEach(s => { g.fillStyle = 'rgba(154,167,174,.18)'; g.fillRect(L + s[0] * pw, T, (s[1] - s[0]) * pw, ph); });
+  o.series.forEach(s => {
+    const d = s.data; if (!d.length) return; g.strokeStyle = s.c; g.lineWidth = s.w || 1.6; g.setLineDash(s.dash || []); g.beginPath();
+    const n = d.length, stepPx = Math.max(1, Math.floor(n / pw)); let first = true;
+    for (let i = 0; i < n; i += stepPx) { const v = d[i]; if (v == null || isNaN(v)) { first = true; continue; } const xx = L + (s.x0 ?? 0) * pw + i / (o.span - 1) * pw, yy = y(Math.min(o.max, Math.max(o.min, v))); first ? g.moveTo(xx, yy) : g.lineTo(xx, yy); first = false; }
+    g.stroke(); g.setLineDash([]); g.lineWidth = 1;
+  });
+  g.fillStyle = '#5A6A75'; g.fillText(o.xLabel || '', L, h - 3);
+}
+
+/* ---------- scoreboard ---------- */
+function renderScore() {
+  const o = sim.outcomes(), sc = sim.s.scenario, e = o.edge, c = o.cloud, s = sim.s;
+  $('scTitle').textContent = LE.SCENARIOS[sc].title; $('scBlurb').textContent = LE.SCENARIOS[sc].blurb;
+  const cls = (good, txt) => `<span class="${good === null ? '' : good ? 'good' : 'bad'}">${txt}</span>`;
+  const rows = [];
+  if (sc === 's1' || (sc === 'free' && e.onset !== null)) {
+    rows.push(['Fault seen after', cls(e.detectLatencySec !== null ? e.slaMet : null, e.onset === null ? '–' : fmtDur(e.detectLatencySec)), cls(c.detectLatencySec !== null ? c.slaMet : (s.edge.out.onset !== null ? false : null), c.onset === null ? '–' : c.detectLatencySec === null ? 'not yet' : fmtDur(c.detectLatencySec))]);
+    rows.push(['90 s SLA', cls(e.slaMet, e.slaMet === null ? '–' : e.slaMet ? 'met' : 'missed'), cls(c.slaMet === null ? (c.onset !== null ? false : null) : c.slaMet, c.slaMet === null ? (c.onset !== null ? 'missed' : '–') : c.slaMet ? 'met' : 'missed')]);
+  }
+  if (sc === 's3') {
+    const seize = 460 * 60, lead = t => t === null ? null : seize - t;
+    rows.push(['Warning before seizure', cls(lead(e.warnFirst) > 0, lead(e.warnFirst) === null ? 'none yet' : fmtDur(lead(e.warnFirst))), cls(lead(c.warnFirst) > 0, lead(c.warnFirst) === null ? 'none yet' : lead(c.warnFirst) > 0 ? fmtDur(lead(c.warnFirst)) : 'after seizure')]);
+    rows.push(['Roadside breakdown', cls(!e.breakdown, e.breakdown ? 'yes' : 'avoided'), cls(!c.breakdown, c.breakdown ? 'yes' : s.t < seize ? 'pending' : 'avoided')]);
+  }
+  rows.push(['Peak cargo temp', `${e.maxT.toFixed(1)} °C`, `${c.maxT.toFixed(1)} °C`]);
+  rows.push(['Minutes above 8 °C', cls(e.minutesAbove <= sim.cfg.spoilMinutes, e.minutesAbove.toFixed(1)), cls(c.minutesAbove <= sim.cfg.spoilMinutes, c.minutesAbove.toFixed(1))]);
+  rows.push(['Cargo', cls(e.cargo === 'Saved', e.cargo === 'Saved' ? 'OK' : 'Spoiled ₹' + (e.loss / 1e5).toFixed(0) + ' L'), cls(c.cargo === 'Saved', c.cargo === 'Saved' ? 'OK' : 'Spoiled ₹' + (c.loss / 1e5).toFixed(0) + ' L')]);
+  rows.push(['Temperature record at ops', cls(e.custodyPct >= sim.cfg.custodyAcceptPct, e.custodyPct.toFixed(1) + '%'), cls(c.custodyPct >= sim.cfg.custodyAcceptPct, c.custodyPct.toFixed(1) + '%')]);
+  if (s.done || sc === 's2') rows.push(['Hospital handover', cls(e.verdict === 'Accepted', s.done ? e.verdict : 'at arrival'), cls(c.verdict === 'Accepted', s.done ? c.verdict : 'at arrival')]);
+  rows.push(['Alerts raised', e.alerts, c.alerts]);
+  rows.push(['Uplink data / cost', `${(e.upMB * 1024).toFixed(0)} KB · ₹${e.costINR.toFixed(3)}`, `${(c.upMB * 1024).toFixed(0)} KB · ₹${c.costINR.toFixed(3)}`]);
+  $('score').innerHTML = `<tr><th></th><th class="th-edge">With edge</th><th class="th-cloud">Without edge</th></tr>` + rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+}
+
+/* ---------- sensors ---------- */
+function renderSensors() {
+  const s = sim.s, span = 1800, t = s.t, tw = UI.view === 'cloud' ? s.cloud : s.edge, other = UI.view === 'edge' ? s.cloud : null;
+  const sl = a => a.slice(Math.max(0, a.length - span));
+  const shade = []; const t0 = t - span; sim.cfg.deadZones.forEach(([a, d]) => { const x0 = (a * 60 - t0) / span, x1 = ((a + d) * 60 - t0) / span; if (x1 > 0 && x0 < 1) shade.push([Math.max(0, x0), Math.min(1, x1)]); });
+  const td = sl(tw.hist.temp), x0 = Math.max(0, (span - td.length) / span);
+  const tmax = Math.max(10, ...td.slice(-600).map(v => v + 1), ...(other ? sl(other.hist.temp).slice(-600).map(v => v + 1) : []));
+  const series = [{ data: td, c: UI.view === 'cloud' ? C.cloud : C.edge, x0 }];
+  if (other) series.unshift({ data: sl(other.hist.temp), c: C.cloud, dash: [4, 3], x0 });
+  chart($('cTemp'), { min: 0, max: Math.min(36, Math.ceil(tmax)), span, series, x0, shade, ticks: [0, 4, 8].concat(tmax > 16 ? [16, 24, 32] : []), bands: [{ lo: 3, hi: 5, c: 'rgba(46,132,85,.10)' }, { lo: 5, hi: 7, c: 'rgba(201,138,18,.10)' }], lines: [{ v: 8, c: C.crit, dash: [3, 3] }], xLabel: 'last 30 simulated minutes · grey = no signal' + (other ? ' · dashed = without edge' : '') });
+  const vd = sl(tw.hist.vib); chart($('cVib'), { min: 0, max: 1.8, span, series: [{ data: vd, c: UI.view === 'cloud' ? C.cloud : C.edge, x0 }], shade, ticks: [0, 0.45, 1.2], lines: [{ v: 0.7, c: C.warn, dash: [3, 3] }], xLabel: UI.view === 'cloud' ? 'measured on the truck but never uploaded in the cloud-only design' : '0.5 Hz RMS after 5-sample moving average' });
+  $('vTemp').textContent = tw.meas ? tw.meas.T.toFixed(2) + ' °C' : '–'; $('vVib').textContent = tw.meas ? tw.meas.V.toFixed(2) + ' g' : '–';
+  $('vDoor').textContent = s.door; $('vDoor').style.color = s.door === 'OPEN' ? C.warn : C.ink;
+  const dl = $('doorLine'); let h = ''; let open = null; s.doorLog.forEach(d => { if (d.state === 'OPEN') open = d.t; else if (open !== null) { h += seg(open, d.t); open = null; } }); if (open !== null) h += seg(open, t);
+  function seg(a, b) { const x0 = Math.max(0, (a - t0) / span), x1 = Math.min(1, (b - t0) / span); return x1 > 0 ? `<i style="left:${x0 * 100}%;width:${Math.max(0.4, (x1 - x0) * 100)}%"></i>` : ''; }
+  dl.innerHTML = h;
+  const ext = ['temperature', 'vibration', 'door'].filter(k => sim.isExt(k));
+  $('sensorSrc').innerHTML = ext.length ? `<span class="src ext">external: ${ext.join(', ')}</span>` : `<span class="src">built-in mock</span>`;
+  document.querySelectorAll('#anomBtns button').forEach(b => b.classList.toggle('on', b.dataset.m === s.anomaly));
+  document.querySelectorAll('#linkBtns button').forEach(b => b.classList.toggle('on', b.dataset.m === s.linkOverride));
+}
+
+/* ---------- pipeline ---------- */
+function renderPipeline() {
+  const s = sim.s, hw = LE.HARDWARE[s.hw], m = sim.models[s.model], showCloud = UI.view === 'cloud';
+  const tw = showCloud ? s.cloud : s.edge, inf = tw.lastInf, cls = inf ? inf.cls : 0;
+  $('pipeTitle').firstChild.textContent = showCloud ? 'Cloud-only pipeline ' : 'Edge pipeline ';
+  $('pipeHw').textContent = showCloud ? 'gateway → cellular → cloud' : `${hw.name.split(' (')[0]} · ${s.model}`;
+  $('classBadge').className = 'class-badge c' + cls; $('className').textContent = inf ? LE.CLASSES[cls] : 'waiting';
+  $('className').style.color = clsColor(cls);
+  const probs = inf && inf.probs ? inf.probs : null;
+  $('probs').innerHTML = probs ? LE.CLASSES.map((n, i) => `<div class="prob"><span>${n}</span><span class="b"><i style="width:${(probs[i] * 100).toFixed(1)}%;background:${clsColor(i)}"></i></span><span class="num">${(probs[i] * 100).toFixed(0)}%</span></div>`).join('') + `<div class="small muted">${inf.source === 'external' ? 'from your inference service' : 'mock rules (stand-in for your MLP)'}${inf.latencyMs != null ? ` · ${inf.latencyMs.toFixed(2)} ms` : ''}</div>`
+    : `<div class="small muted">${showCloud ? 'Cloud rule: |mean − 4 °C| > 1 → Warning, > 3 → Critical. Needs data to arrive first.' : 'First window closes 30 s after start.'}</div>`;
+  const P = s.peripherals, ext = k => sim.isExt(k) ? '<span class="src ext">external</span>' : '';
+  let st;
+  if (!showCloud) {
+    const q = tw.queue.length, f = tw.lastFeat;
+    st = [
+      ['Sensors', `${P.temp ? 'temp' : '<b>temp off</b>'} · ${P.accel ? 'vib' : '<b>vib off</b>'} · ${P.door ? 'door' : '<b>door off</b>'}`, !(P.temp && P.accel)],
+      ['Local MQTT broker on the truck', 'logibridge/trucks/…/sensors/#', false],
+      ['Filter: 5-sample moving average' + ext('temperature'), `${tw.fT.length ? tw.fT[tw.fT.length - 1][1].toFixed(2) : '–'} °C`, false],
+      ['Window 30 s, step 10 s', `next in ${10 - (s.t % 10)} s`, false],
+      ['Features → 6-value vector' + ext('features'), f ? `${f[0].toFixed(2)} °C, ${f[3].toFixed(2)} g` : (tw.faultRaised ? 'sensor missing' : '–'), tw.faultRaised],
+      ['Normalise with training_stats' + (s.shiftStats ? ' <span class="src" style="color:#C2352B">+3σ shift</span>' : ''), tw.lastZ ? `z max ${Math.max(...tw.lastZ.map(Math.abs)).toFixed(1)}` : '–', false],
+      [`Model ${s.model} on ${s.hw.toUpperCase()}` + ext('inference'), inf && inf.latencyMs != null ? `${inf.latencyMs.toFixed(2)} ms` : '–', false],
+      ['Alert logic: 2 windows to confirm', tw.alertState ? LE.CLASSES[tw.alertState] + ' active' : 'quiet', false],
+      ['Local log + store-and-forward queue', q ? `${q} queued` : 'empty', false],
+      ['Cellular uplink', s.connected ? 'up' : (P.modem ? 'no signal' : 'modem unplugged'), !s.connected],
+    ];
+  } else {
+    const rx = tw.cloudRx.length;
+    st = [
+      ['Sensors (temperature only is uploaded)', 'vibration stays on the truck', false],
+      ['Telematics gateway, no buffer', '', false],
+      ['Cellular link', sim.cloudLinkUp() ? 'up' : 'no signal · samples dropped', !sim.cloudLinkUp()],
+      ['Cloud ingest', `${tw.lost} samples lost so far`, tw.lost > 0],
+      ['Cloud threshold rules every 10 s', inf ? LE.CLASSES[inf.cls] : '–', false],
+      ['Ops centre phones the driver', tw.pendingDriver ? 'call placed' : tw.awaitCall ? 'waiting for signal' : '–', !!tw.awaitCall],
+      ['Driver logbook, every 2 h', `${tw.manual.length} entries`, false],
+    ];
+  }
+  const hot = showCloud ? -1 : (s.t % 10 === 0 ? 6 : s.t % 10 < 2 ? 4 : -1);
+  $('stages').innerHTML = st.map((x, i) => `<li class="${x[2] ? 'off' : ''} ${i === hot ? 'hot' : ''}"><span class="t">${x[0]}</span><span class="v">${x[1]}</span></li>`).join('');
+  const f = showCloud ? null : tw.lastFeat, z = showCloud ? null : tw.lastZ;
+  $('featTable').innerHTML = f ? `<tr><th>feature</th><th>raw</th><th>z</th></tr>` + LE.FEATURES.map((n, i) => `<tr><td>${n}</td><td>${f[i].toFixed(3)}</td><td class="${z && Math.abs(z[i]) > 3 ? 'zhot' : ''}">${z ? z[i].toFixed(2) : '–'}</td></tr>`).join('') : '';
+}
+
+/* ---------- ops centre ---------- */
+function renderOps() {
+  const s = sim.s; $('linkDot').className = 'dot' + (s.connected ? '' : ' off');
+  $('linkTxt').textContent = s.connected ? 'Truck reachable over cellular' : (s.peripherals.modem ? 'No signal — truck is on its own' : 'Modem unplugged');
+  const q = s.edge.queue; $('queueTxt').textContent = q.length ? `Edge node holding ${q.length} records (${(q.reduce((a, b) => a + b.bytes, 0) / 1024).toFixed(1)} KB) for sync.` : 'Nothing waiting on the truck.';
+  const items = s.ops.filter(o => o.recvT <= s.t + 1).slice(0, 60);
+  $('feed').innerHTML = items.length ? items.map(o => { const late = o.delay > 120; const cl = typeof o.cls === 'number' ? 'c' + o.cls : '';
+    return `<li class="${o.arch} ${cl}"><span class="m">${esc(o.msg)}</span><span class="meta">${o.arch === 'edge' ? 'edge' : 'cloud'} · happened ${fmtT(o.t)} · received ${fmtT(o.recvT)} ${o.delay > 1 ? `· <span class="${late ? 'late' : ''}">${late ? 'late by ' : 'after '}${fmtDur(o.delay)}</span>` : ''}</span></li>`; }).join('')
+    : '<li>No alerts yet. Run a scenario or inject an anomaly.</li>';
+}
+
+/* ---------- hardware tab ---------- */
+function renderHW() {
+  const s = sim.s, c = sim.cfg;
+  $('hwCards').innerHTML = Object.entries(LE.HARDWARE).map(([k, h]) => {
+    const lat = sim.models[s.model].latencyMs * h.latFactor, pw = h.tdpW <= c.aiPowerBudgetW;
+    return `<button class="card ${k === s.hw ? 'sel' : ''}" data-hw="${k}"><h3>${h.name}</h3><div class="small muted">${h.runtime}</div>
+      <div class="k"><span>Unit price</span><span>₹${h.priceINR.toLocaleString('en-IN')}</span></div>
+      <div class="k"><span>Pilot fleet ×${c.fleetPilot} / full ×${c.fleetFull}</span><span>₹${(h.priceINR * c.fleetPilot / 1e5).toFixed(1)} L / ₹${(h.priceINR * c.fleetFull / 1e5).toFixed(1)} L</span></div>
+      <div class="k"><span>Power vs ${c.aiPowerBudgetW} W budget</span><span class="${pw ? 'good' : 'bad'}">${h.tdpW} W</span></div>
+      <div class="k"><span>${s.model} latency (est.)</span><span>${lat.toFixed(2)} ms</span></div>
+      <div class="k"><span>${h.ram.label} / ${h.store.label}</span><span>${kb(h.ram.totalKB)} / ${kb(h.store.totalKB)}</span></div>
+      <div class="k"><span>Docker</span><span>${h.docker ? 'yes' : 'no — firmware OTA'}</span></div></button>`; }).join('');
+  document.querySelectorAll('#hwCards .card').forEach(b => b.onclick = () => { sim.setHardware(b.dataset.hw); renderAll(true); });
+  // wiring diagram
+  const h = LE.HARDWARE[s.hw], P = s.peripherals, ids = Object.keys(LE.PERIPHERALS);
+  const pos = { temp: [10, 50], accel: [10, 150], door: [10, 250], gps: [565, 50], modem: [565, 150], buzzer: [565, 250] }, PW = 185;
+  let g = `<rect x="270" y="40" width="220" height="270" rx="10" fill="#F2F7F9" stroke="${C.edge}" stroke-width="2"/><text x="380" y="64" text-anchor="middle" font-weight="700" font-size="14">${esc(h.name.split(' (')[0])}</text>`;
+  h.chips.forEach((ch, i) => { g += `<rect x="288" y="${80 + i * 55}" width="184" height="40" rx="4" fill="#fff" stroke="${C.steel}"/><text x="380" y="${105 + i * 55}" text-anchor="middle" font-size="12.5">${esc(ch)}</text>`; });
+  ids.forEach(id => { const [x, y] = pos[id], on = P[id], left = x < 270, ax = left ? x + PW : x, bx = left ? 270 : 490, cy = y + 26;
+    g += `<line x1="${ax}" y1="${cy}" x2="${bx}" y2="${cy}" stroke="${on ? C.edge : '#C9D2D7'}" stroke-width="${on ? 2.5 : 1.5}" ${on ? '' : 'stroke-dasharray="4 4"'}/>`;
+    g += `<text x="${(ax + bx) / 2}" y="${cy - 5}" text-anchor="middle" font-size="11" fill="#5A6A75">${esc(h.buses[id])}</text>`;
+    g += `<g class="periph" data-p="${id}" tabindex="0" role="button" aria-pressed="${on}"><rect x="${x}" y="${y}" width="${PW}" height="52" rx="6" fill="${on ? '#fff' : '#F6F0EF'}" stroke="${on ? C.edge : C.crit}" ${on ? '' : 'stroke-dasharray="4 3"'}/><text x="${x + 8}" y="${y + 20}" font-size="12.5" font-weight="600">${esc(LE.PERIPHERALS[id].short)}</text><text x="${x + 8}" y="${y + 38}" font-size="11" fill="${on ? '#5A6A75' : C.crit}">${on ? esc(LE.PERIPHERALS[id].note) : 'unplugged · click to connect'}</text></g>`; });
+  $('wiring').innerHTML = g;
+  $('wiring').querySelectorAll('.periph').forEach(el => { const fn = () => { sim.setPeripheral(el.dataset.p, !sim.s.peripherals[el.dataset.p]); renderAll(true); }; el.onclick = fn; el.onkeydown = e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), fn()); });
+  renderRoofline();
+}
+function renderRoofline() {
+  const h = LE.HARDWARE[sim.s.hw], F = parseFloat($('rfFlops').value) || 45, B = parseFloat($('rfBytes').value) || 18;
+  const ai = F / B, ridge = h.gflops / h.gbps, att = Math.min(h.gflops, ai * h.gbps), tms = F / 1000 / att * 1000;
+  const W = 360, H = 200, L = 40, Bm = 26, xs = v => L + (Math.log10(v) + 2) / 5 * (W - L - 8), ys = v => H - Bm - (Math.log10(v) + 1) / 5 * (H - Bm - 8);
+  let g = `<rect x="${L}" y="8" width="${W - L - 8}" height="${H - Bm - 8}" fill="#F7FAFB" stroke="#E3EAED"/>`;
+  const pts = []; for (let e = -2; e <= 3; e += 0.05) { const a = 10 ** e; pts.push(`${xs(a)},${ys(Math.min(h.gflops, a * h.gbps))}`); }
+  g += `<polyline points="${pts.join(' ')}" fill="none" stroke="${C.edge}" stroke-width="2"/>`;
+  g += `<line x1="${xs(ridge)}" y1="8" x2="${xs(ridge)}" y2="${H - Bm}" stroke="${C.steel}" stroke-dasharray="3 3"/><text x="${xs(ridge) + 3}" y="20" font-size="11" fill="#5A6A75">ridge</text>`;
+  g += `<circle cx="${xs(ai)}" cy="${ys(att)}" r="5" fill="${C.warn}"/><text x="${xs(ai) + 7}" y="${ys(att) + 14}" font-size="11">model</text>`;
+  g += `<text x="${L}" y="${H - 8}" font-size="11" fill="#5A6A75">arithmetic intensity, FLOP/byte (log)</text><text x="4" y="14" font-size="11" fill="#5A6A75">GFLOP/s</text>`;
+  $('roofline').innerHTML = g;
+  $('rfTxt').innerHTML = `Roof drawn from ${h.gflops} GFLOP/s peak and ${h.gbps} GB/s bandwidth (CPU only; the NPU/GPU roof is not drawn). Do the Task B2 arithmetic by hand first, then use the dot to check which side of the ridge you land on.`;
+}
+$('rfFlops').oninput = $('rfBytes').oninput = renderRoofline;
+
+/* ---------- memory + data tab ---------- */
+const memCols = ['#0E6A87', '#4C93AA', '#86B7C6', '#C98A12', '#E0B45C', '#82569A', '#C2352B'];
+function bar(label, items, total) {
+  const used = items.reduce((a, b) => a + b.kb, 0);
+  return `<div class="row"><div class="lab"><b>${label}</b><span class="num ${used > total ? 'bad' : ''}">${kb(used)} of ${kb(total)} (${(used / total * 100).toFixed(1)}%)</span></div><div class="track">${items.map((it, i) => `<i title="${esc(it.k)}: ${kb(it.kb)}" style="width:${Math.max(0, it.kb / total * 100)}%;background:${memCols[i % memCols.length]}"></i>`).join('')}</div></div>`;
+}
+function renderMem() {
+  const m = sim.memory(), s = sim.s, c = sim.cfg, o = sim.outcomes();
+  const tbl = (items) => `<table class="mem">${items.map((it, i) => `<tr><td><i class="sw" style="background:${memCols[i % memCols.length]}"></i>${esc(it.k)}</td><td>${kb(it.kb)}</td></tr>`).join('')}</table>`;
+  $('memBars').innerHTML = `<h3 style="margin:0 0 4px;font-size:15px">${LE.HARDWARE[s.hw].name} running ${s.model}</h3>` + bar(m.ramLabel, m.ram, m.ramTotal) + tbl(m.ram) + '<div style="height:10px"></div>' + bar(m.storeLabel, m.store, m.storeTotal) + tbl(m.store)
+    + `<p class="small ${m.fits ? 'muted' : 'bad'}">${m.fits ? 'Fits.' : 'Does not fit on this node.'} The store-and-forward queue grows during signal gaps and drains on sync. Base sizes are estimates; edit LE.HARDWARE to match your measurements.</p>`;
+  const hrs = Math.max(1 / 60, s.t / 3600), perDay = v => v / hrs * 24;
+  const B = c.bytes, rawPerSec = B.tempRaw + B.vibHz * B.vibAxes * B.vibRawPerAxis;
+  $('dataBox').innerHTML = `<h3 style="margin:0 0 4px;font-size:15px">Data generated and sent</h3><table class="mem">
+    <tr><td>Raw sensor data generated on the truck</td><td>${(o.edge.genMB).toFixed(1)} MB</td></tr>
+    <tr><td>Raw rate used (temp ${B.tempRaw} B + vib ${B.vibHz} Hz × ${B.vibAxes} axes × ${B.vibRawPerAxis} B)</td><td>${rawPerSec} B/s</td></tr>
+    <tr><td>Door events</td><td>${s.doorLog.length}</td></tr>
+    <tr><td style="color:${C.edge}">Edge uplink so far (alerts, minute summaries, heartbeats)</td><td>${(o.edge.upMB * 1024).toFixed(1)} KB · ₹${o.edge.costINR.toFixed(4)}</td></tr>
+    <tr><td style="color:${C.cloud}">Cloud-only uplink so far (temperature stream)</td><td>${(o.cloud.upMB * 1024).toFixed(1)} KB · ₹${o.cloud.costINR.toFixed(4)}</td></tr>
+    <tr><td style="color:${C.cloud}">Samples lost in signal gaps (cloud-only)</td><td>${o.cloud.lost.toLocaleString('en-IN')}</td></tr>
+    <tr><td>If every raw byte went up, per truck per day</td><td>${(perDay(o.edge.genMB)).toFixed(0)} MB · ₹${(perDay(o.edge.genMB) * c.costPerMB).toFixed(1)}</td></tr>
+    <tr><td>Edge uplink per truck per day (extrapolated)</td><td>${(perDay(o.edge.upMB) * 1024).toFixed(0)} KB · ₹${(perDay(o.edge.upMB) * c.costPerMB).toFixed(3)}</td></tr>
+    <tr><td>Store-and-forward queue now</td><td>${m.queueKB.toFixed(2)} KB</td></tr></table>
+    <p class="small muted">Byte sizes come from LE.CONFIG.bytes. Set them to the assumptions in your Task A1 calculation so the numbers match your report.</p>`;
+}
+
+/* ---------- models + OTA tab ---------- */
+function renderModels() {
+  const s = sim.s, c = sim.cfg, hw = LE.HARDWARE[s.hw];
+  const v = x => x == null ? '<span class="ph">not measured</span>' : x;
+  $('modelCards').innerHTML = Object.entries(sim.models).map(([k, m]) => { const fitF = hw.store.baseKB + m.sizeKB + 256 <= hw.store.totalKB, fitR = hw.ram.baseKB + m.arenaKB + (s.hw === 'stm32' ? 0 : m.sizeKB) + 32 <= hw.ram.totalKB;
+    return `<button class="card ${k === s.model ? 'sel' : ''}" data-m="${k}"><h3>${esc(m.label)}</h3>${m.placeholder ? '<div class="ph">placeholder numbers — load your benchmark</div>' : '<div class="small good">from your benchmark</div>'}
+    <div class="k"><span>File size</span><span>${m.sizeKB} KB</span></div><div class="k"><span>Mean / p95 latency (laptop)</span><span>${m.latencyMs} / ${m.p95Ms} ms</span></div>
+    <div class="k"><span>Accuracy</span><span>${v(m.accuracy != null ? m.accuracy + '%' : null)}</span></div><div class="k"><span>Critical-class recall</span><span>${v(m.recallC2 != null ? m.recallC2 + '%' : null)}</span></div>
+    <div class="k"><span>Energy per inference</span><span>${v(m.energyMJ != null ? m.energyMJ + ' mJ' : null)}</span></div>
+    <div class="k"><span>Fits ${s.hw.toUpperCase()}</span><span class="${fitF && fitR ? 'good' : 'bad'}">${fitF && fitR ? 'yes' : 'no'}</span></div></button>`; }).join('');
+  document.querySelectorAll('#modelCards .card').forEach(b => b.onclick = () => { sim.setModel(b.dataset.m); mqttPublishControl({ model: b.dataset.m }); renderAll(true); });
+  const ev = s.ota[0];
+  $('otaBox').innerHTML = `<h3 style="margin:0 0 4px;font-size:15px">Last model update</h3>` + (ev ? `<div class="small">${ev.from} → ${ev.to} at ${fmtT(ev.t)} · ${ev.docker ? 'Docker rebuild with MODEL_PATH' : 'MCU firmware-style update'}</div><ul class="layers">${ev.layers.map(l => `<li class="${l.cached ? '' : 'rebuilt'}">${l.cached ? 'CACHED ' : 'REBUILT'}  ${esc(l.cmd)}</li>`).join('')}</ul>
+    <table class="mem"><tr><td>Bytes per truck (changed layer only)</td><td>${(ev.bytes / 1024).toFixed(0)} KB</td></tr><tr><td>Pilot fleet ×${c.fleetPilot}</td><td>${(ev.bytes * c.fleetPilot / 1048576).toFixed(2)} MB · ₹${(ev.bytes * c.fleetPilot / 1048576 * c.costPerMB).toFixed(2)}</td></tr></table>` : '<p class="small muted">Pick a different model card to see which layers change.</p>');
+  $('fitBox').innerHTML = `<h3 style="margin:0 0 4px;font-size:15px">What changes when you switch model</h3><p class="small">Inference latency scales with the node (${hw.latFactor}× laptop here), the tensor arena and file size move the memory bars, and the mock adds a little probability noise for quantised variants so you can see the effect on borderline windows. Real accuracy and recall come only from your benchmark — load it in Connect your code.</p>`;
+}
+
+/* ---------- drift tab ---------- */
+function renderDrift() {
+  const s = sim.s, h = s.psiHist, c = sim.cfg, ref = sim.referenceDist || [0, 0, 0, 0];
+  const span = Math.max(30, Math.min(h.length, 240)), d = h.slice(-span).map(x => x[1]);
+  chart($('cPsi'), { min: 0, max: Math.max(0.6, Math.min(3, Math.max(0, ...d) * 1.1)), span, series: [{ data: d, c: C.edge, w: 2 }], ticks: [0, 0.1, 0.25, 0.5], lines: [{ v: c.psi.alertAt, c: C.crit, dash: [4, 3] }, { v: c.psi.okBelow, c: C.ok, dash: [4, 3] }], xLabel: `one point per ${c.psi.everySec} s · last ${span}` });
+  const cur = h.length ? h[h.length - 1][1] : null;
+  $('psiTxt').innerHTML = cur == null ? 'Waiting for 20 inferences…' : `PSI now <b class="num ${cur > c.psi.alertAt ? 'bad' : cur < c.psi.okBelow ? 'good' : 'meh'}">${cur.toFixed(3)}</b> on the last ${c.psi.rolling} inferences${sim.isExt('drift') ? ' (from your drift_monitor)' : ''}.`;
+  const bins = s.psiBins || [0, 0, 0, 0], lab = ['0–0.25', '0.25–0.50', '0.50–0.75', '0.75–1.0'];
+  $('psiSide').innerHTML = `<h3 style="margin:0 0 4px;font-size:15px">Confidence histogram</h3>
+    <div class="btnrow"><button class="btn ${c.psi.confidence === 'pNormal' ? 'on' : ''}" data-c="pNormal">score = P(Normal)</button><button class="btn ${c.psi.confidence === 'max' ? 'on' : ''}" data-c="max">score = max probability</button></div>
+    <table class="mem">${lab.map((l, i) => `<tr><td>${l}</td><td>ref ${(ref[i] * 100).toFixed(1)}% · now ${(bins[i] * 100).toFixed(1)}%</td></tr>`).join('')}</table>
+    <p class="small muted">Which score you track is your design decision in drift_monitor.py. With the max probability, a model that confidently says Critical during an anomaly can look perfectly stable. Try both while injecting <i>combined</i>.</p>
+    <ul class="log">${s.driftAlerts.slice(-8).reverse().map(a => `<li>${fmtT(a.t)}  [LOGIBRIDGE DRIFT ALERT] PSI=${a.v.toFixed(3)}</li>`).join('')}</ul>`;
+  document.querySelectorAll('#psiSide [data-c]').forEach(b => b.onclick = () => { sim.cfg.psi.confidence = b.dataset.c; sim.referenceDist = refs[b.dataset.c]; sim.s.edge.confs = []; renderAll(true); });
+}
+
+/* ---------- integration tab (built once) ---------- */
+const TOPICS = {
+  temperature: 'logibridge/trucks/{id}/sensors/temperature', vibration: 'logibridge/trucks/{id}/sensors/vibration', door: 'logibridge/trucks/{id}/sensors/door',
+  features: 'logibridge/trucks/{id}/features', inference: 'logibridge/trucks/{id}/inference', drift: 'logibridge/trucks/{id}/drift',
+  link: 'logibridge/trucks/{id}/link', gps: 'logibridge/trucks/{id}/gps', node: 'logibridge/trucks/{id}/node/metrics', storage: 'logibridge/trucks/{id}/storage',
+  sync: 'logibridge/trucks/{id}/uplink/sync', alerts: 'logibridge/trucks/{id}/alerts', model_active: 'logibridge/trucks/{id}/model/active', status: 'logibridge/trucks/{id}/status/+',
+  models: 'logibridge/sim/models', control: 'logibridge/trucks/{id}/control' };
+const SCHEMA = {
+  temperature: m => typeof m.value === 'number', vibration: m => typeof m.value === 'number', door: m => m.state === 'OPEN' || m.state === 'CLOSE',
+  features: m => (Array.isArray(m.raw) && m.raw.length === 6) || (Array.isArray(m.norm) && m.norm.length === 6),
+  inference: m => [0, 1, 2].includes(m.class) && (!m.probs || (m.probs.length === 3 && Math.abs(m.probs.reduce((a, b) => a + b, 0) - 1) < 0.02)),
+  drift: m => typeof m.psi === 'number', link: m => typeof m.cellular === 'boolean', gps: m => typeof m.lat === 'number' && typeof m.lon === 'number',
+  node: m => typeof m.cpu_pct === 'number' && typeof m.power_w === 'number', storage: m => ['stored_bytes', 'queued_bytes', 'sent_bytes'].every(k => typeof m[k] === 'number'),
+  sync: m => typeof m.records === 'number' && typeof m.bytes === 'number', alerts: m => [0, 1, 2].includes(m.class), model_active: m => m.model in LE.MODELS, status: m => typeof m.online === 'boolean',
+  models: m => Object.keys(m).filter(k => !['v', 'ts', 'seq', 'src', 'truck_id'].includes(k)).every(k => k in LE.MODELS), control: () => true };
+const EXAMPLES = { temperature: '{"ts": 1727942400.0, "value": 4.12}', vibration: '{"ts": 1727942400.0, "value": 0.46}', door: '{"ts": 1727942400.0, "state": "OPEN"}',
+  features: '{"ts": …, "raw": [6 floats], "norm": [6 floats]}', inference: '{"ts": …, "class": 1, "probs": [0.1, 0.8, 0.1], "latency_ms": 0.9, "model": "M2"}',
+  drift: '{"ts": …, "psi": 0.31}', link: '{"cellular": false}', gps: '{"lat": 19.95, "lon": 74.6}',
+  node: '{"cpu_pct": 6.2, "ram_used_kb": 640000, "ram_total_kb": 8388608, "power_w": 3.1, "power_src": "estimate"}', storage: '{"stored_bytes": 65800, "queued_bytes": 720, "queued_records": 13, "sent_bytes": 17100}',
+  sync: '{"records": 93, "bytes": 4500, "gap_s": 5400}', alerts: '{"class": 2, "msg": "Critical: temp rising", "raised_ts": …, "ts": …}', model_active: '{"model": "M3", "size_kb": 182, "sha256": "…"}', status: '{"online": true}  (last segment = service name, retained, LWT)', models: '{"M2": {"sizeKB": 276, "latencyMs": 0.8, "p95Ms": 1.1, "accuracy": 93.4, "recallC2": 97.1, "energyMJ": 0.12}}', control: '{"anomaly": "combined"} or {"model": "M3"}  ← published BY the UI' };
+function buildIntegration() {
+  $('tab-int').innerHTML = `<div class="grid2"><div>
+    <h3 style="margin:0 0 6px;font-size:15px">Live link to your Python services (MQTT over WebSockets)</h3>
+    <div class="btnrow"><input type="text" id="mqUrl" value="ws://localhost:9001"><input type="text" id="mqTruck" value="${LE.CONFIG.truckId}" style="min-width:140px"><button class="btn" id="mqBtn">Connect</button></div>
+    <div class="small" id="mqStatus">Not connected. The UI runs fully on its built-in mock until messages arrive.</div>
+    <p class="small muted">Each stream you publish replaces the matching mock stage within a second; stop publishing and the mock takes over again after ${LE.CONFIG.externalTimeoutSec} s. Topic names are editable so they can follow your own MQTT design.</p>
+    <table class="topics" id="topicTbl"><colgroup><col style="width:84px"><col style="width:46%"><col><col style="width:96px"></colgroup><tr><th>stream</th><th>topic</th><th>payload</th><th>last seen</th></tr>${Object.entries(TOPICS).map(([k, t]) => `<tr><td>${k}</td><td><input type="text" data-topic="${k}" value="${t}"></td><td class="small muted">${esc(EXAMPLES[k])}</td><td class="small" id="seen-${k}">–</td></tr>`).join('')}</table>
+  </div><div>
+    <h3 style="margin:0 0 6px;font-size:15px">Load your results</h3>
+    <div class="small">benchmark_results.csv (columns: variant, mean_latency_ms, p95_latency_ms, size_kb, accuracy, energy_mj, class2_recall)</div>
+    <textarea id="csvIn" placeholder="variant,mean_latency_ms,p95_latency_ms,size_kb,accuracy,energy_mj,class2_recall&#10;M1,2.1,2.9,1104,94.2,0.31,96.0"></textarea>
+    <div class="btnrow"><button class="btn" id="csvBtn">Apply benchmark</button><span class="small" id="csvMsg"></span></div>
+    <div class="small">training_stats as JSON <code>{"mean":[6], "std":[6]}</code> (export from your training_stats.npy) — or reference_dist.json <code>[4 fractions]</code></div>
+    <textarea id="jsonIn"></textarea>
+    <div class="btnrow"><button class="btn" id="statsBtn">Use as training stats</button><button class="btn" id="refBtn">Use as PSI reference</button><span class="small" id="jsonMsg"></span></div>
+    <h3 style="margin:12px 0 6px;font-size:15px">JavaScript API (browser console)</h3>
+    <pre class="code">LogiEdge.push('temperature', {value: 4.2})
+LogiEdge.push('inference', {class: 2, probs: [.02,.08,.9], latency_ms: .8, model: 'M2'})
+LogiEdge.setModelMetrics('M2', {sizeKB: 276, accuracy: 93.4, recallC2: 97.1})
+LogiEdge.setClassifier((z, raw) => [pNormal, pWarn, pCrit])   // swap the mock
+LogiEdge.on('alert', a => console.log(a))   // also: inference, features, psi, door, ops
+LogiEdge.runSelfTests()                       // same as the Self-test tab</pre>
+  </div></div>`;
+  $('mqBtn').onclick = mqttToggle;
+  $('csvBtn').onclick = () => { try { const n = LogiEdge.loadBenchmarkCSV($('csvIn').value); $('csvMsg').textContent = `Applied ${n} variants.`; renderAll(true); } catch (e) { $('csvMsg').textContent = e.message; } };
+  $('statsBtn').onclick = () => { try { const j = JSON.parse($('jsonIn').value); LogiEdge.setTrainingStats(j); $('jsonMsg').textContent = 'Training stats applied.'; } catch (e) { $('jsonMsg').textContent = 'Invalid JSON: ' + e.message; } };
+  $('refBtn').onclick = () => { try { const j = JSON.parse($('jsonIn').value); LogiEdge.setReferenceDist(j); $('jsonMsg').textContent = 'Reference applied.'; } catch (e) { $('jsonMsg').textContent = 'Invalid JSON: ' + e.message; } };
+}
+function renderIntegration() {
+  Object.keys(TOPICS).forEach(k => { const el = $('seen-' + k); if (!el) return; const c = UI.contract[k]; el.innerHTML = c ? `<span class="${c.ok ? 'pass' : 'fail'}">${c.ok ? '✓' : '✗ bad payload'}</span> ${Math.round((Date.now() - c.at) / 1000)} s ago` : '–'; });
+}
+
+/* ---------- MQTT bridge ---------- */
+let client = null;
+function topicMatch(pat, topic) { const p = pat.split('/'), t = topic.split('/'); for (let i = 0; i < p.length; i++) { if (p[i] === '#') return true; if (p[i] !== '+' && p[i] !== t[i]) return false; } return p.length === t.length; }
+function topicFor(k) { const inp = document.querySelector(`[data-topic="${k}"]`); return (inp ? inp.value : TOPICS[k]).replace('{id}', ($('mqTruck') || {}).value || LE.CONFIG.truckId); }
+function loadMqttLib() { return new Promise((res, rej) => { if (window.mqtt) return res(); const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js'; s.onload = res; s.onerror = () => rej(new Error('Could not load mqtt.js from the CDN. Check your internet connection.')); document.head.appendChild(s); }); }
+async function mqttToggle() {
+  if (client) { client.end(true); client = null; $('mqBtn').textContent = 'Connect'; $('mqStatus').textContent = 'Disconnected.'; return; }
+  try { await loadMqttLib(); } catch (e) { $('mqStatus').textContent = e.message; return; }
+  $('mqStatus').textContent = 'Connecting…';
+  client = mqtt.connect($('mqUrl').value, { reconnectPeriod: 2000, connectTimeout: 4000 });
+  client.on('connect', () => { $('mqBtn').textContent = 'Disconnect'; $('mqStatus').innerHTML = '<span class="pass">Connected.</span> Subscribed to every topic in the table.'; Object.keys(TOPICS).filter(k => k !== 'control').forEach(k => client.subscribe(topicFor(k))); });
+  client.on('error', e => { $('mqStatus').textContent = 'MQTT error: ' + e.message + '. Is Mosquitto listening for WebSockets on this port?'; });
+  client.on('close', () => { if (client) $('mqStatus').textContent = 'Connection closed — retrying…'; });
+  client.on('message', (topic, buf) => { const k = Object.keys(TOPICS).find(x => topicMatch(topicFor(x), topic)); if (!k || k === 'control') return; const txt = buf.toString(); if (!txt) return; let m; try { m = JSON.parse(txt); } catch { UI.contract[k] = { ok: false, at: Date.now() }; return; } LogiEdge.push(k, m, topic); });
+}
+function mqttPublishControl(obj) { if (client && client.connected) client.publish(topicFor('control'), JSON.stringify({ ts: Date.now() / 1000, ...obj })); }
+
+/* =====================================================================
+   SINGLE-SCREEN STAGE: status card + data-path flow
+   ===================================================================== */
+const kbS = v => v >= 1048576 ? +(v / 1048576).toFixed(1) + ' GB' : v >= 1024 ? Math.round(v / 1024) + ' MB' : Math.round(v) + ' KB';
+const fmtB = b => b >= 1048576 ? (b / 1048576).toFixed(b >= 10485760 ? 0 : 1) + ' MB' : b >= 1024 ? (b / 1024).toFixed(1) + ' KB' : Math.round(b) + ' B';
+function renderStatus() {
+  const s = sim.s, cloud = UI.view === 'cloud', tw = cloud ? s.cloud : s.edge;
+  const T = tw.meas ? tw.meas.T : 4;
+  const cls = tw.lastInf ? tw.lastInf.cls : 0, stale = cloud && !sim.cloudLinkUp();
+  $('stTemp').textContent = T.toFixed(1) + ' °C'; $('stTemp').style.color = T > 8 ? C.crit : C.ink;
+  $('stClass').textContent = stale ? 'No data' : LE.CLASSES[cls]; $('stClass').className = 'st-class ' + (stale ? 'stale' : 'c' + cls);
+  $('stSub').textContent = `${cloud ? 'Cloud classifier' : 'Edge classifier'} · door ${s.door.toLowerCase()} · ${(cloud ? sim.cloudLinkUp() : s.connected) ? 'signal up' : 'no signal'}`;
+  const span = 1800, sl = a => a.slice(Math.max(0, a.length - span)), d = sl(tw.hist.temp), o = sl((cloud ? s.edge : s.cloud).hist.temp);
+  const mx = Math.max(10, ...d.slice(-900).map(v => v + 1), ...o.slice(-900).map(v => v + 1));
+  chart($('stSpark'), { min: 0, max: Math.min(36, Math.ceil(mx)), span, series: [{ data: o, c: cloud ? C.edge : C.cloud, dash: [3, 3], w: 1.2, x0: Math.max(0, (span - o.length) / span) }, { data: d, c: cloud ? C.cloud : C.edge, w: 2, x0: Math.max(0, (span - d.length) / span) }], ticks: [0, 8], lines: [{ v: 8, c: C.crit, dash: [3, 3] }], xLabel: 'last 30 min · dashed = other design' });
+  const out = sim.outcomes(), e = out.edge, c = out.cloud, sc = s.scenario, g = (good, txt) => `<span class="${good === null ? '' : good ? 'good' : 'bad'}">${txt}</span>`;
+  const rows = [];
+  if (sc === 's3') {
+    const seize = 460 * 60, lead = x => x === null ? null : seize - x;
+    rows.push(['Warning before seizure', g(e.warnFirst === null ? null : lead(e.warnFirst) > 0, e.warnFirst === null ? '–' : fmtDur(lead(e.warnFirst))), g(c.warnFirst === null ? null : lead(c.warnFirst) > 0, c.warnFirst === null ? '–' : lead(c.warnFirst) > 0 ? fmtDur(lead(c.warnFirst)) : 'after it')]);
+    rows.push(['Breakdown', g(e.breakdown ? false : s.t >= seize ? true : null, e.breakdown ? 'yes' : s.t >= seize ? 'avoided' : '–'), g(c.breakdown ? false : null, c.breakdown ? 'yes' : '–')]);
+  } else if (e.onset !== null) {
+    const since = s.t - e.onset;
+    rows.push(['Fault detected in', g(e.detectLatencySec === null ? null : e.slaMet, e.detectLatencySec === null ? '…' : fmtDur(e.detectLatencySec)), g(c.detectLatencySec === null ? (since > 90 ? false : null) : c.slaMet, c.detectLatencySec === null ? (since > 90 ? 'not yet' : '…') : fmtDur(c.detectLatencySec))]);
+  }
+  rows.push(['Cargo', g(e.cargo === 'Saved', e.cargo === 'Saved' ? `OK · peak ${e.maxT.toFixed(1)}°` : 'Spoiled'), g(c.cargo === 'Saved', c.cargo === 'Saved' ? `OK · peak ${c.maxT.toFixed(1)}°` : 'Spoiled')]);
+  rows.push(['Record at ops', g(e.custodyPct >= sim.cfg.custodyAcceptPct, e.custodyPct.toFixed(0) + '%'), g(c.custodyPct >= sim.cfg.custodyAcceptPct, c.custodyPct.toFixed(0) + '%')]);
+  if (s.done) rows.push(['Hospital handover', g(e.verdict === 'Accepted', e.verdict), g(c.verdict === 'Accepted', c.verdict)]);
+  $('stScore').innerHTML = `<tr><th>${esc(LE.SCENARIOS[sc].title)}</th><th class="th-edge">With edge</th><th class="th-cloud">Without</th></tr>` + rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+  const SV = ['simulator', 'preprocessing', 'inference', 'drift_monitor', 'uplink_agent', 'node_monitor'];
+  $('stSvc').innerHTML = '<span class="muted">Live services</span> ' + SV.map(n => { const v = s.services[n]; const st = !v ? 'none' : v.online ? 'on' : 'off'; return `<span class="svc ${st}" title="${n}: ${st === 'none' ? 'not seen, mock covers it' : st === 'on' ? 'online' : 'offline (last will)'}">${n.replace('_monitor', '').replace('_agent', '')}</span>`; }).join('');
+  if (document.activeElement !== $('stAnom')) $('stAnom').value = s.anomaly;
+  document.querySelectorAll('#stLink button').forEach(b => b.classList.toggle('on', b.dataset.m === s.linkOverride));
+}
+$('stAnom').onchange = e => { sim.setAnomaly(e.target.value); mqttPublishControl({ anomaly: e.target.value }); renderAll(true); };
+document.querySelectorAll('#stLink button').forEach(b => b.onclick = () => { sim.setLink(b.dataset.m); renderAll(true); });
+
+const CONN_SVG = '<svg viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true"><line class="ln" x1="2" y1="11" x2="88" y2="11"/><polygon class="ah" points="88,3 100,11 88,19"/></svg>';
+function buildConn(id, label) { $(id).innerHTML = `<div class="cl">${label}</div>${CONN_SVG}<div class="cv"></div><div class="floaters"></div><div class="syncmsg"></div>`; }
+function buildFlow() {
+  const cloud = UI.view === 'cloud';
+  $('fSensors').innerHTML = `<h3>Sensors <span class="tag">on the truck</span></h3>
+    <div class="kv"><span>Temperature</span><b id="fsT">–</b></div><div class="kv"><span>Vibration RMS</span><b id="fsV">–</b></div>
+    <div class="kv"><span>Door</span><b id="fsD">–</b></div><div class="kv"><span>Raw rate</span><b id="fsR">–</b></div>
+    <div class="small muted" id="fsNote"></div>`;
+  buildConn('cA', 'raw samples');
+  if (!cloud) {
+    $('fChip').className = 'fcard chip';
+    const HWS = { rpi5: 'Pi 5', jetson: 'Jetson', stm32: 'STM32' }, MS = { M1: 'M1', M2: 'M2', M3: 'M3' };
+    $('fChip').innerHTML = `<h3>Edge node <span class="tag" id="fcRuntime"></span></h3>
+      <div class="edgegrid"><div class="ecol">
+        <div class="lbl-sm">Chip</div>
+        <div class="seg-sm" id="fcHwSeg">${Object.keys(LE.HARDWARE).map(k => `<button data-hw="${k}">${HWS[k] || k}</button>`).join('')}</div>
+        <div class="small" id="fcHwName"></div><div class="small muted" id="fcHwInfo"></div>
+        <div class="meter"><div class="top-l"><span id="fcMemL">Memory</span><b id="fcMem">–</b></div><div class="trk"><i id="fcMemBar"></i></div></div>
+        <div class="meter"><div class="top-l"><span>Compute</span><b id="fcCpu">–</b></div><canvas id="fcCpuSpark"></canvas></div>
+        <div class="meter"><div class="top-l"><span>Power</span><b id="fcPow">–</b></div><div class="trk"><i id="fcPowBar"></i><em id="fcPowBudget"></em></div></div>
+        <div class="small muted" id="fcNote"></div>
+      </div><div class="ecol mcol">
+        <div class="lbl-sm">Model</div>
+        <div class="seg-sm" id="fcModelSeg">${Object.keys(sim.models).map(k => `<button data-m="${k}">${MS[k] || k}</button>`).join('')}</div>
+        <div class="small" id="fcModelName"></div>
+        <div class="probs" id="fcProbs"></div>
+        <div class="kv"><span>Latency on this chip</span><b id="fcLat">–</b></div>
+        <div class="kv"><span>Model size</span><b id="fcSize">–</b></div>
+        <div class="kv"><span>Accuracy</span><b id="fcAcc">–</b></div>
+        <div class="kv"><span>Critical recall</span><b id="fcRec">–</b></div>
+      </div></div>`;
+    $('fcHwSeg').querySelectorAll('button').forEach(b => b.onclick = () => { sim.setHardware(b.dataset.hw); renderAll(true); });
+    $('fcModelSeg').querySelectorAll('button').forEach(b => b.onclick = () => { sim.setModel(b.dataset.m); mqttPublishControl({ model: b.dataset.m }); renderAll(true); });
+    buildConn('cB', 'written to local storage');
+    $('fStore').className = 'fcard';
+    $('fStore').innerHTML = `<h3>Local storage <span class="tag" id="fstKind"></span></h3><div class="big" id="fstBig">–</div>
+      <div class="storebar" title="blue: already sent · amber: waiting for signal"><i id="fstSynced" style="background:var(--edge)"></i><i id="fstPend" style="background:var(--warn)"></i></div>
+      <div class="kv"><span>Window records</span><b id="fstW">0</b></div><div class="kv"><span>Alerts logged</span><b id="fstA">0</b></div>
+      <div class="kv"><span>Waiting to send</span><b id="fstQ">0 B</b></div><div class="kv"><span>Capacity used</span><b id="fstCap">–</b></div>`;
+  } else {
+    $('fChip').className = 'fcard dim';
+    $('fChip').innerHTML = `<h3>Telematics gateway</h3><div class="kv"><span>AI model</span><b>none</b></div><div class="kv"><span>Local buffer</span><b>none</b></div>
+      <div class="kv"><span>Uploads</span><b>temperature, 1 Hz</b></div><div class="kv"><span>Vibration</span><b>not sent (cost)</b></div>
+      <div class="small muted">Every decision is made in the cloud, so every decision needs signal.</div>`;
+    buildConn('cB', 'nothing stored');
+    $('fStore').className = 'fcard dim';
+    $('fStore').innerHTML = `<h3>No local storage</h3><div class="small muted">Samples taken during a signal gap are lost.</div><div class="big bad" id="fstBig">0 B lost</div><div class="kv"><span>Samples dropped</span><b id="fstDrop">0</b></div><div class="kv"><span>Driver logbook entries</span><b id="fstMan">0</b></div>`;
+  }
+  buildConn('cC', 'cellular');
+  ['cA', 'cB', 'cC'].forEach(id => $(id).classList.toggle('cloud', cloud));
+  $('fBackend').innerHTML = `<h3>Operations centre <span class="tag">Pune</span></h3><div class="big" id="fbBig">–</div>
+    <div class="kv"><span>Data at ops</span><b id="fbAge">–</b></div><div class="kv"><span>Alerts received</span><b id="fbN">0</b></div><ul class="alerts-mini" id="fbList"></ul>`;
+}
+function floatLabel(connId, text, red) {
+  const box = $(connId).querySelector('.floaters'); if (!box) return;
+  const el = document.createElement('span'); el.textContent = text; if (red) el.className = 'red'; box.appendChild(el); setTimeout(() => el.remove(), 1500);
+}
+function connState(id, { value, label, flowing, cut, burst }) {
+  const el = $(id); el.querySelector('.cv').innerHTML = value; if (label !== undefined) el.querySelector('.cl').innerHTML = label;
+  el.classList.toggle('flowing', !!flowing && !cut); el.classList.toggle('cut', !!cut); el.classList.toggle('burst', !!burst);
+}
+function renderFlow() {
+  const s = sim.s, cloud = UI.view === 'cloud', e = s.edge, cl = s.cloud, now = performance.now(), B = sim.cfg.bytes;
+  const xs = !cloud && sim.isExt('storage') ? s.extStorage : null;
+  const cur = { gen: e.bytes.generated, local: xs ? xs.stored : e.localLogBytes, up: cloud ? cl.bytes.up : xs ? xs.sent : e.bytes.up, drop: cl.droppedBytes || 0, syncs: s.syncs.length, link: cloud ? sim.cloudLinkUp() : s.connected };
+  const p = UI.prev || cur; UI.prev = cur;
+  // a connector "flows" while its counter moved in the last 0.7 s; deltas are batched into floating +X labels
+  const act = (k, d, conn, red) => { if (d > 0) { UI.active[k] = now; UI.pend[k] = (UI.pend[k] || 0) + d; if (now - (UI.lastFloat[k] || 0) > (k === 'gen' ? 1100 : 450)) { floatLabel(conn, '+' + fmtB(UI.pend[k]), red); UI.pend[k] = 0; UI.lastFloat[k] = now; } } return now - (UI.active[k] || -1e9) < 700; };
+  // sensors
+  const P = s.peripherals, tw = cloud ? cl : e;
+  $('fsT').textContent = P.temp ? (tw.meas ? tw.meas.T.toFixed(2) + ' °C' : '–') : 'unplugged'; $('fsV').textContent = P.accel ? (tw.meas ? tw.meas.V.toFixed(2) + ' g' : '–') : 'unplugged';
+  $('fsD').textContent = s.door; $('fsD').style.color = s.door === 'OPEN' ? C.warn : '';
+  $('fsR').textContent = fmtB(B.tempRaw + B.vibHz * B.vibAxes * B.vibRawPerAxis) + '/s';
+  $('fsNote').textContent = cloud ? 'Only temperature leaves the truck.' : sim.isExt('temperature') ? 'Fed by your simulator over MQTT.' : 'Built-in mock streams.';
+  const aOn = act('gen', cur.gen - p.gen, 'cA');
+  connState('cA', { value: fmtB(cur.gen) + '<div class="small muted">generated</div>', flowing: aOn && UI.running });
+  if (!cloud) {
+    const hw = LE.HARDWARE[s.hw], m = sim.memory(), ch = s.chip;
+    const md = sim.models[s.model];
+    $('fcHwSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.hw === s.hw));
+    $('fcModelSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === s.model));
+    $('fcRuntime').textContent = hw.runtime; $('fcHwName').textContent = hw.name; $('fcHwInfo').textContent = `₹${hw.priceINR.toLocaleString('en-IN')}/truck · fleet ₹${(hw.priceINR * sim.cfg.fleetPilot / 1e5).toFixed(1)} L`; $('fcModelName').textContent = md.label;
+    const pr = e.lastInf && e.lastInf.probs;
+    $('fcProbs').innerHTML = pr ? LE.CLASSES.map((n, i) => `<div class="prob"><span>${n}</span><span class="b"><i style="width:${(pr[i] * 100).toFixed(1)}%;background:${clsColor(i)}"></i></span><span class="num">${(pr[i] * 100).toFixed(0)}%</span></div>`).join('') + `<div class="small muted">${e.lastInf.source === 'external' ? 'output of your inference service' : 'mock rules, not your MLP'}</div>` : '<div class="small muted">First window closes 30 s after start.</div>';
+    const lat = e.lastInf && e.lastInf.latencyMs != null && e.lastInf.model === s.model ? e.lastInf.latencyMs : md.latencyMs * hw.latFactor;
+    $('fcLat').textContent = lat.toFixed(2) + ' ms';
+    const fitF = hw.store.baseKB + md.sizeKB + 256 <= hw.store.totalKB, fitR = hw.ram.baseKB + md.arenaKB + (s.hw === 'stm32' ? 0 : md.sizeKB) + 32 <= hw.ram.totalKB;
+    $('fcSize').innerHTML = `${md.sizeKB} KB · <span class="${fitF && fitR ? 'good' : 'bad'}">${fitF && fitR ? 'fits' : 'too big'}</span>`;
+    const ph = '<span class="ph">not measured</span>';
+    $('fcAcc').innerHTML = md.accuracy != null ? `<span class="${md.accuracy >= 88 ? 'good' : 'bad'}">${md.accuracy}%</span>` : ph;
+    $('fcRec').innerHTML = md.recallC2 != null ? `<span class="${md.recallC2 >= 95 ? 'good' : 'bad'}">${md.recallC2}%</span>` : ph;
+    if (s.ota.length !== UI.otaSeen) { const ev = s.ota[0]; if (ev && UI.otaSeen !== undefined) { const fleet = ev.bytes * sim.cfg.fleetPilot / 1048576; UI.otaMsg = `OTA ↓ ${ev.to} · ${Math.round(ev.bytes / 1024)} KB per truck · ${ev.docker ? 'model layer only' : 'flash slot B'}`; UI.otaTo = ev.to; UI.otaUntil = now + 4500; } UI.otaSeen = s.ota.length; }
+    $('fcMemL').textContent = m.ramLabel === 'SRAM' ? 'Memory (SRAM)' : 'Memory'; $('fcMem').textContent = `${kbS(m.ramUsed)} of ${kbS(m.ramTotal)}`;
+    $('fcMemBar').style.width = Math.min(100, m.ramUsed / m.ramTotal * 100) + '%'; $('fcMemBar').style.background = m.ramUsed > m.ramTotal ? C.crit : C.edge;
+    const xn = sim.isExt('node') ? s.extNode : null;
+    if (xn && xn.ramUsedKB != null && xn.ramTotalKB) { $('fcMem').textContent = `${kbS(xn.ramUsedKB)} of ${kbS(xn.ramTotalKB)}`; $('fcMemBar').style.width = Math.min(100, xn.ramUsedKB / xn.ramTotalKB * 100) + '%'; }
+    if (xn) { s.cpuHist.push(xn.cpu); s.cpuHist.shift(); }
+    $('fcCpu').textContent = (xn ? xn.cpu : ch.cpu).toFixed(1) + '%' + (xn ? ' ·live' : '');
+    const hist = s.cpuHist.slice(-120); chartMini($('fcCpuSpark'), hist);
+    const pmax = Math.max(15, hw.tdpW + 2), over = ch.power > sim.cfg.aiPowerBudgetW;
+    const pw = xn ? xn.power : ch.power; $('fcPow').textContent = pw.toFixed(2) + ' W' + (xn ? ` ·${xn.src}` : ''); $('fcPow').style.color = pw > sim.cfg.aiPowerBudgetW ? C.crit : '';
+    $('fcPowBar').style.width = Math.min(100, pw / pmax * 100) + '%'; $('fcPowBar').style.background = pw > sim.cfg.aiPowerBudgetW ? C.crit : C.ok;
+    $('fcPowBudget').style.left = (sim.cfg.aiPowerBudgetW / pmax * 100) + '%';
+    $('fcNote').textContent = `Modem ${ch.modem} · red mark = ${sim.cfg.aiPowerBudgetW} W budget`;
+    const bOn = act('local', cur.local - p.local, 'cB');
+    connState('cB', { value: fmtB(cur.local) + '<div class="small muted">copied locally</div>', flowing: bOn && UI.running });
+    const qB = xs ? xs.queued : e.queue.reduce((a, b) => a + b.bytes, 0), stored = xs ? xs.stored : e.localLogBytes, synced = Math.max(0, stored - qB), qN = xs ? (xs.records ?? '?') : e.queue.length;
+    $('fstKind').textContent = m.storeLabel; $('fstBig').innerHTML = fmtB(stored) + ' <small>stored</small>';
+    $('fstSynced').style.width = (stored ? synced / stored * 100 : 0) + '%'; $('fstPend').style.width = (stored ? qB / stored * 100 : 0) + '%';
+    $('fstW').textContent = (e.windowRecords || 0).toLocaleString('en-IN'); $('fstA').textContent = e.alerts.length;
+    $('fstQ').innerHTML = qB ? `<span class="meh">${fmtB(qB)} · ${qN} records</span>` : '0 B'; $('fstCap').textContent = (m.storeUsed / m.storeTotal * 100).toFixed(1) + '%';
+  } else {
+    connState('cB', { value: '<span class="muted">0 B</span>', flowing: false });
+    $('fstBig').innerHTML = fmtB(cur.drop) + ' <small>lost</small>'; $('fstDrop').textContent = cl.lost.toLocaleString('en-IN'); $('fstMan').textContent = cl.manual.length;
+    if (UI.running) act('drop', cur.drop - p.drop, 'cB', true);
+  }
+  // wireless link + sync burst
+  const msg = $('cC').querySelector('.syncmsg');
+  if (cur.syncs > p.syncs && !cloud) { const sy = s.syncs[s.syncs.length - 1]; msg.className = 'syncmsg show'; msg.textContent = `Signal back · syncing ${sy.n} records · ${fmtB(sy.bytes)}`; UI.syncShownUntil = now + 3500; floatLabel('cC', '+' + fmtB(sy.bytes)); UI.lastFloat.up = now; UI.pend.up = 0; }
+  if (cloud && cur.link && !p.link) { msg.className = 'syncmsg show lost'; msg.textContent = `Signal back · ${cl.lost.toLocaleString('en-IN')} samples already lost`; UI.syncShownUntil = now + 3500; }
+  if (!cur.link) UI.syncShownUntil = 0;
+  if (now > UI.syncShownUntil) msg.className = 'syncmsg';
+  if (!cloud && now < (UI.otaUntil || 0) && now > UI.syncShownUntil) { msg.className = 'syncmsg show ota'; msg.textContent = cur.link ? UI.otaMsg : `OTA ${UI.otaTo} waiting for signal`; }
+  const cOn = act('up', cur.up - p.up, 'cC');
+  const linkLbl = cur.link ? '<span class="good">cellular · up</span>' : `<span class="bad">${s.peripherals.modem || cloud ? 'no signal' : 'modem unplugged'}</span>`;
+  connState('cC', { label: linkLbl, value: fmtB(cur.up) + '<div class="small muted">sent</div>', flowing: cOn && UI.running, cut: !cur.link, burst: now < UI.syncShownUntil && !cloud });
+  // backend
+  const age = sim.dataAgeSec(tw); $('fbBig').innerHTML = fmtB(cur.up) + ' <small>received</small>';
+  $('fbAge').innerHTML = age < 120 ? '<span class="good">live</span>' : `<span class="${age > 1800 ? 'bad' : 'meh'}">${fmtDur(age)} old</span>`;
+  const al = s.ops.filter(o => o.arch === (cloud ? 'cloud' : 'edge') && typeof o.cls === 'number' && o.recvT <= s.t + 1);
+  $('fbN').textContent = al.filter(o => o.cls > 0).length;
+  $('fbList').innerHTML = al.slice(0, 3).map(o => `<li class="c${o.cls}">${esc(o.msg.length > 60 ? o.msg.slice(0, 58) + '…' : o.msg)}<br><span class="late ${o.delay > 120 ? 'bad' : 'muted'}">${o.delay > 120 ? 'arrived ' + fmtDur(o.delay) + ' late' : 'received ' + fmtT(o.recvT)}</span></li>`).join('') || '<li class="muted">No alerts</li>';
+}
+function chartMini(cv, data) {
+  const lo = data.length ? Math.floor(Math.min(...data)) : 0, hi = data.length ? Math.max(lo + 1, Math.ceil(Math.max(...data) + 0.2)) : 1;
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight; if (!w) return; cv.width = w * dpr; cv.height = h * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr);
+  g.fillStyle = '#EEF3F5'; g.fillRect(0, 0, w, h); if (!data.length) return; g.strokeStyle = C.edge; g.lineWidth = 1.4; g.beginPath();
+  data.forEach((v, i) => { const x = i / 119 * w, y = h - 2 - (v - lo) / (hi - lo) * (h - 4); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); g.fillStyle = '#5A6A75'; g.font = '10px Barlow Semi Condensed, sans-serif'; g.fillText(hi + '%', w - 22, 10); g.fillText(lo + '%', w - 22, h - 2);
+}
+
+/* ---------- details overlay + keyboard ---------- */
+function setDetails(open) { UI.details = open; $('details').hidden = !open; renderAll(true); if (open) $('closeDetails').focus(); }
+$('detailsBtn').onclick = () => setDetails(!UI.details); $('closeDetails').onclick = () => setDetails(false);
+document.addEventListener('keydown', ev => {
+  const tag = (ev.target.tagName || '').toLowerCase(); if (['input', 'select', 'textarea'].includes(tag)) return;
+  if (ev.key === 'Escape' && UI.details) setDetails(false);
+  else if (ev.key === 'd' || ev.key === 'D') setDetails(!UI.details);
+  else if (ev.key === ' ' && !UI.details && tag !== 'button') { ev.preventDefault(); $('play').click(); }
+});
+
+/* ---------- log ---------- */
+function renderLog() { $('logList').innerHTML = sim.s.log.slice(-250).reverse().map(e => `<li>${fmtT(e.t)}  ${esc(e.src.padEnd(5))} ${esc(e.msg)}</li>`).join(''); }
+
+/* ---------- render orchestration ---------- */
+function renderHeader() { $('clock').textContent = fmtT(sim.s.t); $('play').textContent = sim.s.done ? '↻ Run again' : UI.running ? '❚❚ Pause' : '▶ Run'; $('play').classList.toggle('on', UI.running); document.querySelectorAll('#viewSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === UI.view)); $('detailsBtn').classList.toggle('on', UI.details); const ext = ['temperature', 'vibration', 'door', 'features', 'inference'].some(k => sim.isExt(k)); $('extBanner').classList.toggle('show', ext); }
+function renderAll(force) {
+  renderHeader(); renderMap(); renderStatus(); renderFlow();
+  if (!UI.details) return;
+  ribbon($('ribEdge'), sim.s.edge, true); ribbon($('ribCloud'), sim.s.cloud, false);
+  $('pctEdge').textContent = sim.custodyPct(sim.s.edge).toFixed(1) + '%'; $('pctCloud').textContent = sim.custodyPct(sim.s.cloud).toFixed(1) + '%';
+  renderScore(); renderSensors(); renderPipeline(); renderOps();
+  ({ hw: renderHW, mem: renderMem, models: renderModels, drift: renderDrift, int: renderIntegration, log: renderLog, test: () => {} })[UI.tab]();
+}
+function loop(ts) {
+  const dt = Math.min(0.25, (ts - (UI.last || ts)) / 1000); UI.last = ts;
+  const ext = ['temperature', 'vibration', 'door', 'features', 'inference'].some(k => sim.isExt(k));
+  if (UI.running && !sim.s.done) { UI.acc += dt * (ext ? 1 : UI.speed); const n = Math.min(4000, Math.floor(UI.acc)); UI.acc -= n; sim.run(n); }
+  if (ts - UI.lastRender > 120) { UI.lastRender = ts; renderAll(); }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- public API: window.LogiEdge ---------- */
+window.LogiEdge = {
+  get sim() { return sim; }, set sim(v) { },
+  LE,
+  push(stream, msg, topic) { if (stream === 'status' && msg && !msg._service) msg._service = topic ? topic.split('/').pop() : (msg.service || 'unknown'); const ok = SCHEMA[stream] ? SCHEMA[stream](msg) : false; UI.contract[stream] = { ok, at: Date.now() }; if (!ok) { sim._log('ext', `Rejected ${stream} payload: ${JSON.stringify(msg).slice(0, 80)}`); return false; }
+    if (stream === 'models') { Object.entries(msg).forEach(([k, v]) => this.setModelMetrics(k, v)); return true; }
+    if (stream === 'control') return true; sim.ext(stream, msg); return true; },
+  setModelMetrics(id, m) { if (!sim.models[id]) throw new Error('Unknown model ' + id); Object.assign(sim.models[id], m, { placeholder: false }); return sim.models[id]; },
+  loadBenchmarkCSV(text) {
+    const lines = text.trim().split(/\r?\n/).filter(Boolean); if (lines.length < 2) throw new Error('Need a header row and at least one data row.');
+    const head = lines[0].split(',').map(x => x.trim().toLowerCase()), col = n => head.indexOf(n); if (col('variant') < 0) throw new Error('Missing "variant" column.');
+    const map = { mean_latency_ms: 'latencyMs', p95_latency_ms: 'p95Ms', size_kb: 'sizeKB', accuracy: 'accuracy', energy_mj: 'energyMJ', class2_recall: 'recallC2' };
+    let n = 0; lines.slice(1).forEach(l => { const c = l.split(',').map(x => x.trim()); const id = (c[col('variant')] || '').toUpperCase().slice(0, 2); if (!sim.models[id]) return; const m = {}; Object.entries(map).forEach(([csv, key]) => { const i = col(csv); if (i >= 0 && c[i] !== '' && !isNaN(+c[i])) m[key] = +c[i]; }); this.setModelMetrics(id, m); n++; });
+    if (!n) throw new Error('No rows matched M1, M2 or M3.'); return n;
+  },
+  setTrainingStats(st) { if (!st || st.mean?.length !== 6 || st.std?.length !== 6) throw new Error('Expected {mean:[6], std:[6]}'); sim.trainingStats = st; sim._log('ext', 'Training stats replaced'); },
+  setReferenceDist(r) { if (!Array.isArray(r) || r.length !== 4) throw new Error('Expected [4 fractions]'); sim.referenceDist = r; sim._log('ext', 'PSI reference replaced'); },
+  setClassifier(fn) { sim.classifier = fn; sim._log('ext', fn ? 'Custom classifier installed' : 'Mock classifier restored'); },
+  on(evt, cb) { return sim.on(evt, cb); },
+  scenario(id) { newSim(id); }, play() { UI.running = true; }, pause() { UI.running = false; },
+  setView(v) { UI.view = v; buildFlow(); UI.prev = null; renderAll(true); }, openDetails(o = true) { setDetails(o); }, render: () => renderAll(true),
+  runSelfTests: () => LE.runSelfTests(),
+  _ui: UI, _topics: TOPICS, _schema: SCHEMA,
+};
+
+buildIntegration(); newSim('free');
+$('runTests').onclick = () => { const r = LE.runSelfTests(); $('testSummary').innerHTML = `<span class="${r.failed ? 'fail' : 'pass'}">${r.passed} passed, ${r.failed} failed</span> in ${r.ms.toFixed(0)} ms`; $('testList').innerHTML = r.results.map(x => `<li><span class="${x.ok ? 'pass' : 'fail'}">${x.ok ? '✓' : '✗'}</span> ${esc(x.name)}${x.ok ? '' : ` <span class="small fail">${esc(x.err)}</span>`}</li>`).join(''); };
+window.addEventListener('resize', () => renderAll(true));
+requestAnimationFrame(loop);
+if (/[?&]selftest/.test(location.search)) { setDetails(true); UI.tab = 'test'; document.querySelector('#tabs [data-t=test]').click(); $('runTests').click(); }
+})();
+
+</script>
+</body>
+</html>

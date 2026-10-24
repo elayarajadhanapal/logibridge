@@ -1,0 +1,13 @@
+# LogiBridge — Python dependencies for the local development machine.
+# Install:  python -m venv .venv  &&  .venv\Scripts\activate  &&  pip install -r requirements.txt
+#
+# Mosquitto (MQTT broker) is a system program, not a pip package — see docs/SETUP.md.
+# Further dependencies (tensorflow, tensorflow-model-optimization, psutil, ...) are added
+# here as each component is implemented.
+
+# Dashboard interface + Component C — data pipeline
+paho-mqtt>=2.1,<3
+numpy>=1.26
+
+# Tests
+pytest>=8
