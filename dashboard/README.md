@@ -10,13 +10,21 @@ Single-file visual harness for the LogiBridge pipeline (`logiedge_dashboard.html
 
 ## Running
 
-The HTML file opens directly in Chrome or Edge. Appending `?selftest` to the URL runs the built-in test suite on load.
+`python run.py` (or `run.bat`) in the repository root starts the broker and every implemented service, then opens this page — see [../docs/SETUP.md](../docs/SETUP.md). The page needs no clicks: on load it connects to `ws://localhost:9001` (retrying until the broker is up), starts the clock and shows only live data (mock data off). The banner reports the broker connection and lists the streams with no live data yet.
+
+The HTML file can also be opened directly in Chrome or Edge, e.g. while the stack is already running.
+
+| URL parameter | Effect |
+|---|---|
+| `?mock` | Starts with mock data on |
+| `?ws=ws://host:port` | Connects to another broker |
+| `?selftest` | Runs the built-in test suite on load (no broker connection) |
 
 The main screen fits one window without scrolling, sized for recording at 1440×900 or 1920×1080. It shows the route map, a status card (cargo temperature, class, with/without-edge comparison, anomaly and cellular controls) and the data path: sensors → edge node (chip selector Pi 5 / Jetson / STM32 with memory, compute and power; model selector M1 / M2 / M3 with live class probabilities, latency on the selected chip, size and fit, accuracy and Critical recall) → local storage → cellular → operations centre. Counters on each arrow show bytes generated, stored locally and sent, with a banner when a signal gap ends and the queue syncs, and an OTA banner when the model changes.
 
 Further panels are under **Details** (key D; Esc closes): custody ribbons, full scoreboard, pipeline stages, feature table, hardware wiring, memory breakdown, models and OTA, drift, integration, self-test and event log. Space starts and pauses the run.
 
-The live connection requires Mosquitto with a WebSocket listener on 9001 in addition to TCP 1883 (`deployment/mosquitto.conf`, see [../docs/SETUP.md](../docs/SETUP.md)); it is opened under Details → **Connect your code** → **Connect**. The module interface demos (e.g. `python inference/inference_dashboard_iface.py`) publish valid data on their topics and print the control messages the dashboard sends.
+The live connection requires Mosquitto with a WebSocket listener on 9001 (started by `run.py`, or by hand with `deployment/mosquitto.conf`). Details → **Connect your code** shows the connection, the topic table and every message's contract check; the same tab can disconnect and reconnect to another URL. The module interface demos (e.g. `python inference/inference_dashboard_iface.py`) publish valid data on their topics and print the control messages the dashboard sends.
 
 ## Mock and live stages
 
@@ -29,7 +37,23 @@ The live connection requires Mosquitto with a WebSocket listener on 9001 in addi
 | Model metrics | Placeholder numbers, flagged in the UI | `logibridge/sim/models` or CSV import |
 | Cellular state | Follows the route's signal gaps | `…/link` |
 
-A stream counts as live while messages keep arriving; five seconds after the last one, the mock resumes. While any sensor, feature or inference stream is live, speed is locked to 1× so timestamps line up.
+A stream counts as live while messages keep arriving. It stops counting as live 5 s after its last message, or about 2.5 publish periods for the slower streams (`features` and `inference` 25 s, `drift` 150 s; `externalTimeoutBySec` in `LE.CONFIG`). While any stream is live, or mock data is off, the clock runs at 1× real time so timestamps line up.
+
+### Mock data toggle
+
+The **Mock data on / Mock data off** control in the status card selects whether the built-in mock fills stages that have no live data.
+
+| | Mock data off (default) | Mock data on |
+|---|---|---|
+| Stage with live data | Live data | Live data |
+| Stage without live data | `–` / "No data" / "waiting for …"; charts show a gap | Built-in mock |
+| Banner | "Mock data OFF", listing the streams with no live data yet | "External data is driving the edge node" while any stream is live |
+| Edge alerts at the operations centre | Only alerts published by `uplink_agent` | Mock alert logic, unless `uplink_agent` is online |
+| CPU / power, local storage, bytes sent | Only values from `node_monitor` / `uplink_agent` | Mock estimates, unless `node_monitor` / `uplink_agent` publish |
+
+Every page load starts with mock data off; `?mock` in the URL starts with it on. Mock data on is useful for exploring the scenarios without any Python code.
+
+> **Note:** the toggle covers the edge pipeline. The route, signal gaps, scenario timeline, scoreboard and the "without edge" (cloud-only) comparison are part of the scenario model and stay simulated in both modes; no LogiBridge service implements them.
 
 > **Note:** the mock rules are deliberately simple. Their numbers are not results and are not quoted in the reports.
 

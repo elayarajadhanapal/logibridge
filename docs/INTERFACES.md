@@ -11,7 +11,7 @@ Specification of the topics, payloads and commands exchanged between the LogiBri
 
 Both listeners belong to the same Mosquitto broker (`deployment/mosquitto.conf`); services and dashboard never communicate directly.
 
-Every dashboard stage has a built-in mock. When a service publishes on a stage's topic, the dashboard displays that data instead; if the messages stop for 5 seconds, the mock resumes. While any sensor, feature or inference stream is external, the dashboard clock is locked to 1× real time so timestamps line up.
+Every dashboard stage has a built-in mock. When a service publishes on a stage's topic, the dashboard displays that data instead; if the messages stop for 5 s (25 s for `features` and `inference`, 150 s for `drift`), the stage counts as having no live data. With mock data off (the default), such a stage shows "no data"; with mock data on, the mock resumes. While any sensor, feature or inference stream is external, the dashboard clock is locked to 1× real time so timestamps line up.
 
 The dashboard owns the scenario (route timing, signal gaps, anomaly injection, model choice) and announces it as commands on the `control` topic. Services report the resulting state on their own topics; the dashboard does not assume a command succeeded until the report arrives (for example `model/active` after a model switch).
 
