@@ -32,7 +32,7 @@ Ctrl+C (or closing the window) stops the services and the broker.
 | `--anomaly temp_drift` | Simulator starts in another mode (the dashboard's *Inject* selector also switches it live) |
 | `--no-browser` | Does not open the dashboard |
 
-The dashboard opens with **mock data off**: every edge-pipeline stage shows only what the services publish, and the banner lists the streams with no live data yet. See `dashboard/README.md` for the mock-data toggle and URL options.
+The dashboard opens with the **Mock data (dry run)** checkbox unchecked: every edge-pipeline stage shows only what the services publish, and the banner lists the streams with no live data yet. Checking it switches to a dry run on the built-in mock, which ignores the services. See `dashboard/README.md` for both modes and the URL options.
 
 > **Note:** an already running project broker on port 9001 (an earlier run, or one started by hand) is reused; the launcher verifies which TCP port reaches it.
 

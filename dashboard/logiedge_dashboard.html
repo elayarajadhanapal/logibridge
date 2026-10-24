@@ -29,6 +29,8 @@ header.bar{position:sticky;top:0;z-index:20;background:var(--ink);color:#E9F2F5;
 .brand span{color:#9FB6C1;font-size:13px}
 .ctl{display:flex;align-items:center;gap:6px}
 .ctl label{font-size:12px;color:#9FB6C1}
+.ctl label.chk{display:flex;align-items:center;gap:6px;font-size:14px;color:#fff;cursor:pointer;white-space:nowrap}
+.ctl label.chk input{width:16px;height:16px;margin:0;cursor:pointer;accent-color:#E8A33D}
 .bar select,.bar button{background:#22343F;border:1px solid #37505E;color:#E9F2F5;border-radius:var(--radius-s);padding:5px 9px;cursor:pointer}
 .bar button.on{background:#E9F2F5;color:var(--ink);border-color:#E9F2F5}
 .seg{display:inline-flex;border:1px solid #37505E;border-radius:var(--radius-s);overflow:hidden}
@@ -258,6 +260,7 @@ table.mini td:first-child{text-align:left;font-family:var(--ui);color:var(--mute
   <div class="brand"><b>LogiEdge</b><span>truck <span id="truckId"></span></span></div>
   <div class="ctl"><label for="scenario">Scenario</label><select id="scenario"></select></div>
   <div class="ctl"><span class="seg" id="viewSeg"><button data-v="cloud">Without edge</button><button data-v="edge">With edge</button></span></div>
+  <div class="ctl" title="Unchecked: the edge pipeline shows only data from the Python services. Checked: dry run on the built-in mock; data from the services is ignored."><label class="chk"><input type="checkbox" id="mockChk"> Mock data (dry run)</label></div>
   <div class="ctl"><button id="play" aria-label="Play or pause">▶ Run</button><button id="stepBtn" title="Advance 10 simulated seconds">+10 s</button><button id="resetBtn">Reset</button></div>
   <div class="ctl"><select id="speed" aria-label="Simulation speed"><option value="1">1×</option><option value="10">10×</option><option value="60">60×</option><option value="180" selected>180×</option><option value="600">600×</option></select></div>
   <div class="clock" id="clock">00:00:00</div>
@@ -282,9 +285,7 @@ table.mini td:first-child{text-align:left;font-family:var(--ui);color:var(--mute
       <div class="svcs" id="stSvc"></div>
       <div class="st-ctrls">
         <label>Inject <select id="stAnom"><option value="none">no anomaly</option><option value="temp_drift">temp_drift</option><option value="vibration">vibration</option><option value="combined">combined</option></select></label>
-        <span class="seg light" id="stLink"><button data-m="auto">Route signal</button><button data-m="on">On</button><button data-m="off">Off</button></span>
-        <span class="seg light" id="stMock" title="Built-in mock data for stages without live data. Off = the edge pipeline shows only what the Python services publish."><button data-m="on">Mock data on</button><button data-m="off">Mock data off</button></span>
-      </div>
+        <span class="seg light" id="stLink"><button data-m="auto">Route signal</button><button data-m="on">On</button><button data-m="off">Off</button></span>      </div>
     </div>
   </section>
   <section class="flow" id="flow">
@@ -507,7 +508,7 @@ class Sim {
       t: 0, T: c.tripMinutes * 60, scenario, done: false,
       hw: keep.hw || 'rpi5', model: keep.model || 'M2',
       peripherals: keep.peripherals || { temp: true, accel: true, door: true, gps: true, modem: true, buzzer: true },
-      linkOverride: keep.linkOverride || 'auto', shiftStats: keep.shiftStats || false, liveOnly: keep.liveOnly || false,
+      linkOverride: keep.linkOverride || 'auto', shiftStats: keep.shiftStats || false, liveOnly: keep.liveOnly || false, dryRun: keep.dryRun || false,
       autoResponse: LE.SCENARIOS[scenario].autoResponse, anomaly: 'none',
       door: 'CLOSE', doorLog: [], connected: true, linkLog: [],
       ops: [], log: [], ota: [], syncs: [], cpuHist: [], powHist: [], chip: { cpu: 0, power: 0, modem: 'idle' }, psiHist: [], driftAlerts: [],
@@ -549,6 +550,14 @@ class Sim {
   mockOn(stream) { return !this.s.liveOnly && !this.isExt(stream); }
   /* liveOnly: the edge pipeline shows only data published by the Python services */
   setLiveOnly(on) { this.s.liveOnly = !!on; this._log('sim', on ? 'Mock data OFF: live data only' : 'Mock data ON'); this.emit('liveOnly', this.s.liveOnly); }
+  /* dryRun: the full built-in simulation; data from the Python services is ignored (status badges still update) */
+  setDryRun(on) {
+    const s = this.s; s.dryRun = !!on;
+    if (on) { Object.keys(s.external).forEach(k => { s.external[k] = -1e9; }); s.extOwner.alerts = false; s.extNode = s.extStorage = s.extDrift = s.extLink = s.extGps = null; }
+    this._log('sim', on ? 'Dry run: built-in mock only, live data ignored' : 'Dry run off'); this.emit('dryRun', s.dryRun);
+  }
+  /* Dashboard modes: 'live' = only Python data; 'dry' = only the built-in mock */
+  setMode(mode) { this.setDryRun(mode === 'dry'); this.setLiveOnly(mode === 'live'); }
   /* last inference to display: in live-only mode only a live one counts */
   shownInf(tw) { return tw.kind === 'edge' && this.s.liveOnly && !this.isExt('inference') ? null : tw.lastInf; }
 
@@ -575,7 +584,9 @@ class Sim {
 
   /* ---- external data (from your Python via MQTT, or JS) ---- */
   ext(stream, msg) {
-    const s = this.s, tw = s.edge; s.external[stream] = s.t;
+    const s = this.s, tw = s.edge;
+    if (s.dryRun && stream !== 'status') return;
+    s.external[stream] = s.t;
     if (stream === 'temperature') { this._pushTemp(tw, +msg.value); }
     else if (stream === 'vibration') { this._pushVib(tw, +msg.value); }
     else if (stream === 'door') { this._door(msg.state === 'OPEN' ? 'OPEN' : 'CLOSE', 'external'); }
@@ -957,6 +968,16 @@ LE.runSelfTests = function () {
     s.run(LE.CONFIG.externalTimeoutSec + 1); ok(!Number.isFinite(s.s.edge.meas.T), 'stale temperature still shown'); ok(s.shownInf(s.s.edge), 'inference (10 s stream) dropped after 6 s');
     s.run(LE.CONFIG.externalTimeoutBySec.inference); ok(s.shownInf(s.s.edge) === null, 'stale inference still shown');
   });
+  t('Dry run: data from the Python services is ignored, the mock runs, status badges still update', () => {
+    const s = mk(); s.setMode('dry'); s.run(40);
+    s.ext('temperature', { value: 9.9 }); s.ext('inference', { class: 2, probs: [.05, .05, .9], latency_ms: 1, model: 'M2' }); s.run(1);
+    ok(!s.isExt('temperature') && s.s.edge.meas.T !== 9.9, 'live temperature used in dry run'); ok(s.s.edge.lastInf && s.s.edge.lastInf.source === 'mock', 'live inference used in dry run');
+    s.ext('status', { online: true, _service: 'simulator' }); ok(s.s.services.simulator && s.s.services.simulator.online, 'status ignored');
+  });
+  t('Dry run -> live: mock values disappear, live data is accepted again', () => {
+    const s = mk(); s.setMode('dry'); s.run(100); s.setMode('live'); s.run(2); ok(s.shownInf(s.s.edge) === null && !Number.isFinite(s.s.edge.meas.T), 'mock still shown');
+    s.ext('temperature', { value: 5.1 }); s.run(1); ok(s.s.edge.meas.T === 5.1, 'live data not accepted');
+  });
   t('Mock data back on resumes the mock pipeline', () => { const s = mk(); s.setLiveOnly(true); s.run(60); s.setLiveOnly(false); s.run(60); ok(s.s.edge.lastInf && s.s.edge.lastInf.source === 'mock', 'mock did not resume'); });
   t('Link echo from the uplink agent never overrides the route (no deadlock)', () => { const s = mk(); s.run(40 * 60 + 5); ok(!s.s.connected, 'should be in gap 1'); s.ext('link', { cellular: false }); s.run(36 * 60); ok(s.s.connected, 'route did not restore signal'); });
   t('Uplink agent owning alerts suppresses the mock edge alert path', () => { const s = mk(); s.ext('status', { online: true, _service: 'uplink_agent' }); s.run(60); s.setAnomaly('combined'); s.run(120); ok(s.s.edge.alerts.length > 0 && !s.s.ops.some(o => o.arch === 'edge' && !o.ext && typeof o.cls === 'number'), 'mock alert leaked to ops'); });
@@ -996,8 +1017,8 @@ const boot = LE.bootstrapStats();
 let refs = { max: boot.refMax, pNormal: boot.refPNormal };
 const UI = { view: 'edge', details: false, prev: null, active: {}, lastFloat: {}, pend: {}, syncShownUntil: 0, running: false, speed: 180, acc: 0, last: 0, lastRender: 0, tab: 'hw', extSeen: {}, contract: {} };
 let sim;
-/* Mock data is OFF on every load (only the Python services feed the edge pipeline); ?mock turns it on */
-function loadLiveOnlyPref() { return !/[?&]mock\b/.test(location.search); }
+/* "Mock data" checkbox: unchecked (default) = live data only; checked = dry run on the built-in mock. ?mock checks it. */
+UI.mode = /[?&]mock\b/.test(location.search) ? 'dry' : 'live';
 /* number for display, '–' when there is no live value */
 const fx = (v, digits, unit) => Number.isFinite(v) ? v.toFixed(digits) + unit : '–';
 const finite = a => a.filter(Number.isFinite);
@@ -1006,7 +1027,7 @@ function newSim(scenario = 'free') {
   sim = new LE.Sim({ scenario, trainingStats: prev ? prev.trainingStats : boot.stats, referenceDist: null });
   if (prev) { sim.models = prev.models; sim.classifier = prev.classifier; sim.cfg.psi.confidence = prev.cfg.psi.confidence; sim.s.hw = prev.s.hw; sim.s.model = prev.s.model; sim.s.peripherals = { ...prev.s.peripherals }; sim.referenceDist = prev.referenceDist; }
   if (!sim.referenceDist) sim.referenceDist = refs[sim.cfg.psi.confidence];
-  sim.s.liveOnly = prev ? prev.s.liveOnly : loadLiveOnlyPref();
+  sim.setMode(UI.mode);
   sim.on('external', d => { UI.extSeen[d.stream] = Date.now(); });
   sim.on('link', up => mqttPublishControl({ cellular: up }));
   window.LogiEdge && (window.LogiEdge.sim = sim);
@@ -1363,7 +1384,7 @@ async function mqttToggle() {
   client.on('close', () => { if (client) { UI.mq = 'retrying'; $('mqStatus').textContent = 'Connection closed — retrying…'; } });
   client.on('message', (topic, buf) => { const k = Object.keys(TOPICS).find(x => topicMatch(topicFor(x), topic)); if (!k || k === 'control') return; const txt = buf.toString(); if (!txt) return; let m; try { m = JSON.parse(txt); } catch { UI.contract[k] = { ok: false, at: Date.now() }; return; } LogiEdge.push(k, m, topic); });
 }
-function mqttPublishControl(obj) { if (client && client.connected) client.publish(topicFor('control'), JSON.stringify({ ts: Date.now() / 1000, ...obj })); }
+function mqttPublishControl(obj) { if (sim.s.dryRun) return; /* dry run: commands stay inside the simulation */ if (client && client.connected) client.publish(topicFor('control'), JSON.stringify({ ts: Date.now() / 1000, ...obj })); }
 
 /* =====================================================================
    SINGLE-SCREEN STAGE: status card + data-path flow
@@ -1398,11 +1419,11 @@ function renderStatus() {
   $('stSvc').innerHTML = '<span class="muted">Live services</span> ' + SV.map(n => { const v = s.services[n]; const st = !v ? 'none' : v.online ? 'on' : 'off'; return `<span class="svc ${st}" title="${n}: ${st === 'none' ? 'not seen, mock covers it' : st === 'on' ? 'online' : 'offline (last will)'}">${n.replace('_monitor', '').replace('_agent', '')}</span>`; }).join('');
   if (document.activeElement !== $('stAnom')) $('stAnom').value = s.anomaly;
   document.querySelectorAll('#stLink button').forEach(b => b.classList.toggle('on', b.dataset.m === s.linkOverride));
-  document.querySelectorAll('#stMock button').forEach(b => b.classList.toggle('on', (b.dataset.m === 'off') === s.liveOnly));
+  $('mockChk').checked = s.dryRun;
 }
 $('stAnom').onchange = e => { sim.setAnomaly(e.target.value); mqttPublishControl({ anomaly: e.target.value }); renderAll(true); };
 document.querySelectorAll('#stLink button').forEach(b => b.onclick = () => { sim.setLink(b.dataset.m); renderAll(true); });
-document.querySelectorAll('#stMock button').forEach(b => b.onclick = () => { sim.setLiveOnly(b.dataset.m === 'off'); UI.prev = null; renderAll(true); });
+$('mockChk').onchange = e => { UI.mode = e.target.checked ? 'dry' : 'live'; sim.setMode(UI.mode); UI.prev = null; renderAll(true); };
 
 const CONN_SVG = '<svg viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true"><line class="ln" x1="2" y1="11" x2="88" y2="11"/><polygon class="ah" points="88,3 100,11 88,19"/></svg>';
 function buildConn(id, label) { $(id).innerHTML = `<div class="cl">${label}</div>${CONN_SVG}<div class="cv"></div><div class="floaters"></div><div class="syncmsg"></div>`; }
@@ -1563,11 +1584,14 @@ function renderLog() { $('logList').innerHTML = sim.s.log.slice(-250).reverse().
 function renderHeader() { $('clock').textContent = fmtT(sim.s.t); $('play').textContent = sim.s.done ? '↻ Run again' : UI.running ? '❚❚ Pause' : '▶ Run'; $('play').classList.toggle('on', UI.running); document.querySelectorAll('#viewSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === UI.view)); $('detailsBtn').classList.toggle('on', UI.details); const ext = ['temperature', 'vibration', 'door', 'features', 'inference'].some(k => sim.isExt(k));
   const live = sim.s.liveOnly, waiting = ['temperature', 'vibration', 'features', 'inference', 'drift'].filter(k => !sim.isExt(k));
   const url = ($('mqUrl') || {}).value || 'ws://localhost:9001';
-  const conn = UI.mq === 'connected' ? '' : UI.mq === 'nolib' ? `${UI.mqErr} ` : UI.mq === 'off' ? 'Not connected to the broker (Details → Connect). ' : `Waiting for the broker at ${url} — start everything with "python run.py". Retrying… `;
-  $('extBanner').textContent = conn + (live
-    ? `Mock data OFF — the edge pipeline shows only data from the Python services.${waiting.length ? ' No live data yet for: ' + waiting.join(', ') + '.' : ''}${UI.running ? '' : ' Press ▶ Run to process incoming data.'}`
-    : ext ? 'External data is driving the edge node. Speed is locked to 1× so timestamps line up with your Python services.' : '');
-  $('extBanner').classList.toggle('show', ext || live || !!conn); }
+  const dry = sim.s.dryRun;
+  const conn = dry || UI.mq === 'connected' ? '' : UI.mq === 'nolib' ? `${UI.mqErr} ` : UI.mq === 'off' ? 'Not connected to the broker (Details → Connect). ' : `Waiting for the broker at ${url} — start everything with "python run.py". Retrying… `;
+  $('extBanner').textContent = dry
+    ? 'Dry run — everything shown comes from the built-in mock; data from the Python services is ignored. Uncheck "Mock data" to see live data.'
+    : conn + (live
+      ? `Live data only — the edge pipeline shows only data from the Python services.${waiting.length ? ' No live data yet for: ' + waiting.join(', ') + '.' : ''}${UI.running ? '' : ' Press ▶ Run to process incoming data.'}`
+      : ext ? 'External data is driving the edge node. Speed is locked to 1× so timestamps line up with your Python services.' : '');
+  $('extBanner').classList.toggle('show', dry || ext || live || !!conn); }
 function renderAll(force) {
   renderHeader(); renderMap(); renderStatus(); renderFlow();
   if (!UI.details) return;

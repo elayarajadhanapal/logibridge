@@ -10,13 +10,13 @@ Single-file visual harness for the LogiBridge pipeline (`logiedge_dashboard.html
 
 ## Running
 
-`python run.py` (or `run.bat`) in the repository root starts the broker and every implemented service, then opens this page — see [../docs/SETUP.md](../docs/SETUP.md). The page needs no clicks: on load it connects to `ws://localhost:9001` (retrying until the broker is up), starts the clock and shows only live data (mock data off). The banner reports the broker connection and lists the streams with no live data yet.
+`python run.py` (or `run.bat`) in the repository root starts the broker and every implemented service, then opens this page — see [../docs/SETUP.md](../docs/SETUP.md). The page needs no clicks: on load it connects to `ws://localhost:9001` (retrying until the broker is up), starts the clock and shows only live data (**Mock data** unchecked). The banner reports the broker connection and lists the streams with no live data yet.
 
 The HTML file can also be opened directly in Chrome or Edge, e.g. while the stack is already running.
 
 | URL parameter | Effect |
 |---|---|
-| `?mock` | Starts with mock data on |
+| `?mock` | Starts with **Mock data** checked (dry run) |
 | `?ws=ws://host:port` | Connects to another broker |
 | `?selftest` | Runs the built-in test suite on load (no broker connection) |
 
@@ -28,7 +28,7 @@ The live connection requires Mosquitto with a WebSocket listener on 9001 (starte
 
 ## Mock and live stages
 
-| Stage | Built-in mock | Replaced by live data on |
+| Stage | Built-in mock | Live data on |
 |---|---|---|
 | Sensor streams | Gaussian streams per Task C1, plus a physical plant for the incident scenarios | `…/sensors/temperature`, `/vibration`, `/door` |
 | Features | MA-5 filter, 30 s / 10 s windows, the six features | `…/features` |
@@ -37,23 +37,25 @@ The live connection requires Mosquitto with a WebSocket listener on 9001 (starte
 | Model metrics | Placeholder numbers, flagged in the UI | `logibridge/sim/models` or CSV import |
 | Cellular state | Follows the route's signal gaps | `…/link` |
 
-A stream counts as live while messages keep arriving. It stops counting as live 5 s after its last message, or about 2.5 publish periods for the slower streams (`features` and `inference` 25 s, `drift` 150 s; `externalTimeoutBySec` in `LE.CONFIG`). While any stream is live, or mock data is off, the clock runs at 1× real time so timestamps line up.
+A stream counts as live while messages keep arriving. It stops counting as live 5 s after its last message, or about 2.5 publish periods for the slower streams (`features` and `inference` 25 s, `drift` 150 s; `externalTimeoutBySec` in `LE.CONFIG`).
 
-### Mock data toggle
+### Mock data checkbox
 
-The **Mock data on / Mock data off** control in the status card selects whether the built-in mock fills stages that have no live data.
+The **Mock data (dry run)** checkbox in the top bar selects one of two modes. It is unchecked on every page load; `?mock` in the URL starts with it checked.
 
-| | Mock data off (default) | Mock data on |
+| | Unchecked — live (default) | Checked — dry run |
 |---|---|---|
-| Stage with live data | Live data | Live data |
-| Stage without live data | `–` / "No data" / "waiting for …"; charts show a gap | Built-in mock |
-| Banner | "Mock data OFF", listing the streams with no live data yet | "External data is driving the edge node" while any stream is live |
-| Edge alerts at the operations centre | Only alerts published by `uplink_agent` | Mock alert logic, unless `uplink_agent` is online |
-| CPU / power, local storage, bytes sent | Only values from `node_monitor` / `uplink_agent` | Mock estimates, unless `node_monitor` / `uplink_agent` publish |
+| Edge pipeline data | Only data published by the Python services | Only the built-in mock; messages from the services are ignored |
+| Stage without data | `–` / "No data" / "waiting for …"; charts show a gap | — (the mock fills every stage) |
+| Clock | 1× real time, so timestamps line up with the services | Speed selector applies (e.g. 180×) |
+| Commands (anomaly, model, cellular) | Sent to the services on `control` | Stay inside the simulation |
+| Edge alerts, CPU / power, local storage | Only from `uplink_agent` / `node_monitor` | Mock alert logic and estimates |
+| Service badges | Live | Live (status messages are still shown) |
+| Banner | "Live data only", listing the streams with no live data yet | "Dry run — everything shown comes from the built-in mock" |
 
-Every page load starts with mock data off; `?mock` in the URL starts with it on. Mock data on is useful for exploring the scenarios without any Python code.
+The dry run is the dashboard's standalone simulation, for exploring the scenarios without any Python code; the live mode shows exactly what the implemented services produce.
 
-> **Note:** the toggle covers the edge pipeline. The route, signal gaps, scenario timeline, scoreboard and the "without edge" (cloud-only) comparison are part of the scenario model and stay simulated in both modes; no LogiBridge service implements them.
+> **Note:** the checkbox covers the edge pipeline. The route, signal gaps, scenario timeline, scoreboard and the "without edge" (cloud-only) comparison are part of the scenario model and stay simulated in both modes; no LogiBridge service implements them.
 
 > **Note:** the mock rules are deliberately simple. Their numbers are not results and are not quoted in the reports.
 
