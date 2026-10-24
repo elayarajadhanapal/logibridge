@@ -22,10 +22,10 @@ preprocessing.py:
     dash.features(raw6, norm6, window_start=t0, ts=t1)   # every 10 s
     dash.close()
 
-Callbacks run on the MQTT network thread: keep them short (append to a list or
-queue) and do the real work in your main loop.
+Callbacks run on the MQTT network thread; the usual pattern is to append to a list or
+queue and process the data in the main loop.
 
-Try it without writing any code:   python data_pipeline/data_pipeline_dashboard_iface.py
+Demo with synthetic data:   python data_pipeline/data_pipeline_dashboard_iface.py
 """
 import os
 import sys

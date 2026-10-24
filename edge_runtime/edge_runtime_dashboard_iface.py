@@ -20,7 +20,7 @@ node_monitor.py  (CPU / RAM / power of the edge node):
 Once the uplink agent is online the dashboard stops raising its own alerts and
 shows only what this agent delivers. Callbacks run on the MQTT network thread.
 
-Try it without writing any code:   python edge_runtime/edge_runtime_dashboard_iface.py
+Demo with synthetic data:   python edge_runtime/edge_runtime_dashboard_iface.py
 """
 import os
 import sys

@@ -5,16 +5,16 @@ At the end of benchmark.py:
     from optimisation_dashboard_iface import publish_benchmark_csv
     publish_benchmark_csv("optimisation/results/benchmark_results.csv")
 
-or, from rows you already have in memory:
+or, from rows already in memory:
     from optimisation_dashboard_iface import publish_benchmark_rows
     publish_benchmark_rows([{"variant": "M2", "mean_latency_ms": 0.8, "size_kb": 276, ...}])
 
 CSV columns: variant, mean_latency_ms, p95_latency_ms, size_kb, accuracy, energy_mj, class2_recall
 (accuracy and class2_recall in percent). The message is retained, so a dashboard
-opened later still shows the numbers. No broker? Paste the CSV into the dashboard's
-Connect tab instead.
+opened later still shows the numbers. Without a broker, the CSV can be pasted into the dashboard's
+Connect tab.
 
-Try it without writing any code:   python optimisation/optimisation_dashboard_iface.py
+Demo with synthetic data:   python optimisation/optimisation_dashboard_iface.py
 """
 import csv
 import os

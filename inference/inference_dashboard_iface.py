@@ -10,11 +10,11 @@ inference_dashboard_iface.py — MQTT interface for inference_service.py.
     dash.close()
 
 The inference topic is the one the brief requires: logibridge/trucks/{truck_id}/inference.
-In Docker, build from the repository root so dashboard/dashboard_api.py is copied too.
+The Docker image is built from the repository root so dashboard/dashboard_api.py is included.
 
-Callbacks run on the MQTT network thread: keep them short.
+Callbacks run on the MQTT network thread; long callbacks delay message delivery.
 
-Try it without writing any code:   python inference/inference_dashboard_iface.py
+Demo with synthetic data:   python inference/inference_dashboard_iface.py
 """
 import os
 import sys
