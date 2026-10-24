@@ -1,11 +1,11 @@
 """
 dashboard_api.py — the one place that knows the LogiBridge MQTT contract.
 
-Module engineers do NOT import this file directly. Each module has a small
+Services do not import this file directly. Each module has a small
 `<module>_dashboard_iface.py` with plain methods such as `temperature(4.1)`;
 those methods call `DashboardLink.publish()` below.
 
-What this file does for every service, so nobody has to repeat it:
+Behaviour shared by every service:
   * connects to Mosquitto (localhost:1883) in the background and keeps reconnecting
   * adds the envelope {v, truck_id, ts, seq, src} to every message
   * checks every payload against the contract (docs/INTERFACES.md) and raises
@@ -106,7 +106,7 @@ def _model_metrics(v):
 # ---------------------------------------------------------------------------
 # The contract: stream name -> topic, QoS, retain, required and optional fields.
 # Topics are relative to logibridge/trucks/{truck_id}/ unless they start with
-# "logibridge/". Keep this table identical to docs/INTERFACES.md section 3.
+# "logibridge/". Mirrors docs/INTERFACES.md section 4.
 # ---------------------------------------------------------------------------
 STREAMS = {
     "temperature": dict(topic="sensors/temperature", qos=0, retain=False,

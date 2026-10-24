@@ -7,12 +7,12 @@ monitoring_dashboard_iface.py — MQTT interface for drift_monitor.py.
     dash.drift(psi=0.31, bins=[0.7, 0.1, 0.1, 0.1], n=100)   # every 60 s
     dash.close()
 
-The brief also asks for the console line  [LOGIBRIDGE DRIFT ALERT] PSI={value:.3f}
-— print that yourself in drift_monitor.py; this file only feeds the dashboard.
+The console line  [LOGIBRIDGE DRIFT ALERT] PSI={value:.3f}  required by Task E1
+is printed by drift_monitor.py itself; this file only feeds the dashboard.
 
-Callbacks run on the MQTT network thread: keep them short.
+Callbacks run on the MQTT network thread; long callbacks delay message delivery.
 
-Try it without writing any code:   python monitoring/monitoring_dashboard_iface.py
+Demo with synthetic data:   python monitoring/monitoring_dashboard_iface.py
 """
 import os
 import sys
