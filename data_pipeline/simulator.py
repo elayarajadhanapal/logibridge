@@ -1,46 +1,42 @@
 import argparse
-import json
+import os
+import sys
 import time
-from datetime import datetime, timezone
 
 import numpy as np
-import paho.mqtt.client as mqtt
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from data_pipeline_dashboard_iface import SimulatorDashboard  # noqa: E402
+from dashboard.dashboard_api import (  # noqa: E402  (repo root added by the iface)
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    DEFAULT_TRUCK_ID,
+)
 
 
-DEFAULT_BROKER_HOST = "localhost"
-DEFAULT_BROKER_PORT = 1883
-DEFAULT_TRUCK_ID = "FB-042"
+DEFAULT_BROKER_HOST = DEFAULT_HOST
+DEFAULT_BROKER_PORT = DEFAULT_PORT
 
 TEMPERATURE_SETPOINT_C = 4.0
 TEMPERATURE_STD_C = 0.3
+TEMPERATURE_DRIFT_PER_READING_C = 0.08
 
-VIBRATION_SAMPLE_RATE_HZ = 500
+# Vibration is published as the compressor RMS value at 0.5 Hz (one reading
+# every 2 s), as specified in Task C1. The raw 500 Hz x 3-axis signal is
+# reduced to RMS on the sensor node and never put on MQTT.
+VIBRATION_PERIOD_SECONDS = 2
 VIBRATION_NORMAL_MEAN_G = 0.45
 VIBRATION_NORMAL_STD_G = 0.05
 VIBRATION_ANOMALY_MEAN_G = 1.2
 VIBRATION_ANOMALY_STD_G = 0.15
 
-
-def utc_timestamp() -> str:
-    """Return the current UTC timestamp in ISO-8601 format."""
-    return datetime.now(timezone.utc).isoformat()
-
-
-def temperature_topic(truck_id: str) -> str:
-    return f"logibridge/trucks/{truck_id}/sensors/temperature"
-
-
-def vibration_topic(truck_id: str) -> str:
-    return f"logibridge/trucks/{truck_id}/sensors/vibration"
-
-
-def door_topic(truck_id: str) -> str:
-    return f"logibridge/trucks/{truck_id}/sensors/door"
+DOOR_OPEN_PROBABILITY = 0.02    # per second while closed
+DOOR_CLOSE_PROBABILITY = 0.10   # per second while open (mean ~10 s open)
 
 
 def generate_temperature(
     anomaly: str,
-    elapsed_seconds: int,
+    drift_readings: int,
 ) -> float:
     """
     Generate one temperature reading.
@@ -51,8 +47,8 @@ def generate_temperature(
     Temperature drift:
         +0.08 C per reading.
 
-    Since temperature is generated at 1 Hz, elapsed_seconds is
-    equivalent to the number of temperature readings generated.
+    drift_readings is the number of readings since the drift anomaly
+    was switched on (0 when no drift is active).
     """
 
     temperature = np.random.normal(
@@ -61,16 +57,17 @@ def generate_temperature(
     )
 
     if anomaly in ("temp_drift", "combined"):
-        temperature += 0.08 * elapsed_seconds
+        temperature += TEMPERATURE_DRIFT_PER_READING_C * drift_readings
 
     return float(temperature)
 
 
-def generate_vibration(anomaly: str) -> np.ndarray:
+def generate_vibration(anomaly: str) -> float:
     """
-    Generate one second of 3-axis vibration data.
+    Generate one compressor vibration RMS reading in g.
 
-    500 Hz x 3 axes = 1500 values per second.
+    Normal:   N(0.45, 0.05)
+    Anomaly:  step to N(1.2, 0.15) (bearing wear)
     """
 
     if anomaly in ("vibration", "combined"):
@@ -80,188 +77,166 @@ def generate_vibration(anomaly: str) -> np.ndarray:
         mean = VIBRATION_NORMAL_MEAN_G
         std = VIBRATION_NORMAL_STD_G
 
-    return np.random.normal(
-        loc=mean,
-        scale=std,
-        size=(VIBRATION_SAMPLE_RATE_HZ, 3),
-    )
+    return float(np.random.normal(loc=mean, scale=std))
 
 
 def publish_temperature(
-    client: mqtt.Client,
-    truck_id: str,
+    dash: SimulatorDashboard,
     anomaly: str,
-    elapsed_seconds: int,
-) -> None:
-    """Publish one raw temperature reading."""
+    drift_readings: int,
+    ts: float,
+) -> float:
+    """Publish one temperature reading."""
 
     temperature = generate_temperature(
         anomaly,
-        elapsed_seconds,
+        drift_readings,
     )
 
-    payload = {
-        "timestamp": utc_timestamp(),
-        "truck_id": truck_id,
-        "sensor": "temperature",
-        "temperature_c": round(temperature, 3),
-        "setpoint_c": TEMPERATURE_SETPOINT_C,
-        "sample_rate_hz": 1,
-    }
+    dash.temperature(round(temperature, 3), ts)
 
-    client.publish(
-        temperature_topic(truck_id),
-        json.dumps(payload),
-        qos=1,
-    )
+    return temperature
 
 
 def publish_vibration(
-    client: mqtt.Client,
-    truck_id: str,
+    dash: SimulatorDashboard,
     anomaly: str,
-) -> None:
-    """
-    Publish one second of raw vibration samples.
+    ts: float,
+) -> float:
+    """Publish one vibration RMS reading."""
 
-    We batch the 500 Hz samples into one MQTT message.
-    This avoids creating 500 MQTT messages every second while
-    preserving the underlying raw 500 Hz sensor data.
-    """
+    vibration = generate_vibration(anomaly)
 
-    samples = generate_vibration(anomaly)
+    dash.vibration(round(vibration, 4), ts)
 
-    payload = {
-        "timestamp": utc_timestamp(),
-        "truck_id": truck_id,
-        "sensor": "vibration",
-        "sample_rate_hz": VIBRATION_SAMPLE_RATE_HZ,
-        "axes": ["x", "y", "z"],
-        "duration_seconds": 1,
-        "samples": np.round(samples, 4).tolist(),
-    }
-
-    client.publish(
-        vibration_topic(truck_id),
-        json.dumps(payload),
-        qos=1,
-    )
+    return vibration
 
 
 def publish_door_event(
-    client: mqtt.Client,
-    truck_id: str,
-) -> None:
+    dash: SimulatorDashboard,
+    door_open: bool,
+    ts: float,
+) -> bool:
     """
-    Generate an occasional door-open event.
+    Generate occasional door OPEN / CLOSE events.
 
-    Door is event-based rather than sampled continuously.
+    Door is event-based rather than sampled continuously: a message is
+    published only when the state changes. Returns the new state.
     """
 
-    # Approximately 2% probability of an OPEN event each second.
-    if np.random.random() >= 0.02:
-        return
+    if not door_open and np.random.random() < DOOR_OPEN_PROBABILITY:
+        dash.door("OPEN", ts)
+        return True
 
-    payload = {
-        "timestamp": utc_timestamp(),
-        "truck_id": truck_id,
-        "sensor": "door",
-        "event": "OPEN",
-    }
+    if door_open and np.random.random() < DOOR_CLOSE_PROBABILITY:
+        dash.door("CLOSE", ts)
+        return False
 
-    client.publish(
-        door_topic(truck_id),
-        json.dumps(payload),
-        qos=1,
-    )
+    return door_open
 
 
-def create_mqtt_client(
+def create_dashboard(
     broker_host: str,
     broker_port: int,
     truck_id: str,
-) -> mqtt.Client:
-    """Create and connect the MQTT client."""
-
-    client = mqtt.Client(
-        mqtt.CallbackAPIVersion.VERSION2,
-        client_id=f"logibridge-simulator-{truck_id}",
-    )
+) -> SimulatorDashboard:
+    """Create the MQTT link (topics, payload contract, status, control)."""
 
     print(
         f"Connecting to MQTT broker "
         f"{broker_host}:{broker_port}..."
     )
 
-    client.connect(
-        broker_host,
-        broker_port,
-        keepalive=60,
+    return SimulatorDashboard(
+        truck_id=truck_id,
+        host=broker_host,
+        port=broker_port,
     )
-
-    client.loop_start()
-
-    return client
 
 
 def run_simulation(
-    client: mqtt.Client,
+    dash: SimulatorDashboard,
     truck_id: str,
     anomaly: str,
     duration: int,
 ) -> None:
-    """Run the sensor simulation."""
+    """Run the sensor simulation. duration = 0 runs until Ctrl+C."""
 
     print()
     print("LogiEdge Sensor Simulator")
     print("=========================")
     print(f"Truck ID : {truck_id}")
     print(f"Anomaly  : {anomaly}")
-    print(f"Duration : {duration} seconds")
+    print(f"Duration : {duration or 'until Ctrl+C'} seconds")
     print()
 
-    start_time = time.monotonic()
+    # The anomaly mode can be changed at runtime from the dashboard
+    # (control topic), e.g. to inject drift mid-run for the PSI demo.
+    state = {"anomaly": anomaly}
+
+    def on_anomaly(mode: str) -> None:
+        print(f"Anomaly mode changed: {state['anomaly']} -> {mode}")
+        state["anomaly"] = mode
+
+    dash.on_anomaly_command(on_anomaly)
+
+    drift_readings = 0
+    door_open = False
+    start_wall = time.time()
+    tick = 0
 
     try:
-        while True:
-            elapsed = int(time.monotonic() - start_time)
+        while not duration or tick < duration:
+            # One tick = 1 s of data time, shared by all streams.
+            ts = start_wall + tick
+            mode = state["anomaly"]
 
-            if elapsed >= duration:
-                break
+            # Drift accumulates from the moment it is switched on and
+            # resets when the drift anomaly is switched off.
+            if mode in ("temp_drift", "combined"):
+                drift_readings += 1
+            else:
+                drift_readings = 0
 
-            publish_temperature(
-                client,
-                truck_id,
-                anomaly,
-                elapsed,
+            temperature = publish_temperature(
+                dash,
+                mode,
+                drift_readings,
+                ts,
             )
 
-            publish_vibration(
-                client,
-                truck_id,
-                anomaly,
-            )
+            vibration_text = "-"
+            if tick % VIBRATION_PERIOD_SECONDS == 0:
+                vibration = publish_vibration(
+                    dash,
+                    mode,
+                    ts,
+                )
+                vibration_text = f"{vibration:.3f}g"
 
-            publish_door_event(
-                client,
-                truck_id,
+            door_open = publish_door_event(
+                dash,
+                door_open,
+                ts,
             )
 
             print(
-                f"[{elapsed + 1:04d}s] "
-                f"temperature=OK "
-                f"vibration=OK "
-                f"truck={truck_id}"
+                f"[{tick + 1:04d}s] "
+                f"mode={mode} "
+                f"temperature={temperature:.2f}C "
+                f"vibration={vibration_text} "
+                f"door={'OPEN' if door_open else 'CLOSED'}"
             )
 
-            time.sleep(1)
+            tick += 1
+            # Pace against the start time so the clock does not drift.
+            time.sleep(max(0.0, start_wall + tick - time.time()))
 
     except KeyboardInterrupt:
         print("\nSimulation interrupted.")
 
     finally:
-        client.loop_stop()
-        client.disconnect()
+        dash.close()
 
     print("Simulation finished.")
 
@@ -305,8 +280,15 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--duration",
         type=int,
-        default=60,
-        help="Simulation duration in seconds",
+        default=0,
+        help="Simulation duration in seconds (0 = until Ctrl+C)",
+    )
+
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for reproducible runs",
     )
 
     return parser.parse_args()
@@ -315,14 +297,17 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> None:
     args = parse_arguments()
 
-    client = create_mqtt_client(
+    if args.seed is not None:
+        np.random.seed(args.seed)
+
+    dash = create_dashboard(
         broker_host=args.broker_host,
         broker_port=args.broker_port,
         truck_id=args.truck_id,
     )
 
     run_simulation(
-        client=client,
+        dash=dash,
         truck_id=args.truck_id,
         anomaly=args.anomaly,
         duration=args.duration,
