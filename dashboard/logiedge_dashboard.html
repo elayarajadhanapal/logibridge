@@ -1153,7 +1153,7 @@ function renderSensors() {
   function seg(a, b) { const x0 = Math.max(0, (a - t0) / span), x1 = Math.min(1, (b - t0) / span); return x1 > 0 ? `<i style="left:${x0 * 100}%;width:${Math.max(0.4, (x1 - x0) * 100)}%"></i>` : ''; }
   dl.innerHTML = h;
   const ext = ['temperature', 'vibration', 'door'].filter(k => sim.isExt(k));
-  $('sensorSrc').innerHTML = ext.length ? `<span class="src ext">external: ${ext.join(', ')}</span>` : `<span class="src">built-in mock</span>`;
+  $('sensorSrc').innerHTML = ext.length ? `<span class="src ext">external: ${ext.join(', ')}</span>` : s.liveOnly ? `<span class="src">no live data</span>` : `<span class="src">built-in mock</span>`;
   document.querySelectorAll('#anomBtns button').forEach(b => b.classList.toggle('on', b.dataset.m === s.anomaly));
   document.querySelectorAll('#linkBtns button').forEach(b => b.classList.toggle('on', b.dataset.m === s.linkOverride));
 }
@@ -1340,7 +1340,7 @@ function buildIntegration() {
     <h3 style="margin:0 0 6px;font-size:15px">Live link to your Python services (MQTT over WebSockets)</h3>
     <div class="btnrow"><input type="text" id="mqUrl" value="ws://localhost:9001"><input type="text" id="mqTruck" value="${LE.CONFIG.truckId}" style="min-width:140px"><button class="btn" id="mqBtn">Connect</button></div>
     <div class="small" id="mqStatus">Not connected. The UI runs fully on its built-in mock until messages arrive.</div>
-    <p class="small muted">Each stream you publish replaces the matching mock stage within a second; stop publishing and the mock takes over again after ${LE.CONFIG.externalTimeoutSec} s. Topic names are editable so they can follow your own MQTT design.</p>
+    <p class="small muted">Each stream you publish replaces the matching mock stage within a second. When a stream stops, it shows as no data after ${LE.CONFIG.externalTimeoutSec} s (immediately if the broker connection drops); with "Mock data (dry run)" ticked, the mock runs instead and live data is ignored. Topic names are editable so they can follow your own MQTT design.</p>
     <table class="topics" id="topicTbl"><colgroup><col style="width:84px"><col style="width:46%"><col><col style="width:96px"></colgroup><tr><th>stream</th><th>topic</th><th>payload</th><th>last seen</th></tr>${Object.entries(TOPICS).map(([k, t]) => `<tr><td>${k}</td><td><input type="text" data-topic="${k}" value="${t}"></td><td class="small muted">${esc(EXAMPLES[k])}</td><td class="small" id="seen-${k}">–</td></tr>`).join('')}</table>
   </div><div>
     <h3 style="margin:0 0 6px;font-size:15px">Load your results</h3>
@@ -1373,15 +1373,18 @@ function topicMatch(pat, topic) { const p = pat.split('/'), t = topic.split('/')
 function topicFor(k) { const inp = document.querySelector(`[data-topic="${k}"]`); return (inp ? inp.value : TOPICS[k]).replace('{id}', ($('mqTruck') || {}).value || LE.CONFIG.truckId); }
 function loadMqttLib() { return new Promise((res, rej) => { if (window.mqtt) return res(); const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js'; s.onload = res; s.onerror = () => rej(new Error('Could not load mqtt.js from the CDN. Check your internet connection.')); document.head.appendChild(s); }); }
 /* UI.mq: 'off' | 'connecting' | 'connected' | 'retrying' | 'nolib' — shown in the banner */
+/* Broker gone: live streams and service states are stale at once (no 5–25 s grace, no "online" from before).
+   Retained status messages restore the service states on reconnect. */
+function forgetLiveData() { const s = sim.s; Object.keys(s.external).forEach(k => { s.external[k] = -1e9; }); s.services = {}; renderAll(true); }
 async function mqttToggle() {
-  if (client) { client.end(true); client = null; UI.mq = 'off'; $('mqBtn').textContent = 'Connect'; $('mqStatus').textContent = 'Disconnected.'; return; }
+  if (client) { client.end(true); client = null; UI.mq = 'off'; $('mqBtn').textContent = 'Connect'; $('mqStatus').textContent = 'Disconnected.'; forgetLiveData(); return; }
   UI.mq = 'connecting';
   try { await loadMqttLib(); } catch (e) { UI.mq = 'nolib'; UI.mqErr = e.message; $('mqStatus').textContent = e.message; return; }
   $('mqStatus').textContent = 'Connecting…';
   client = mqtt.connect($('mqUrl').value, { reconnectPeriod: 2000, connectTimeout: 4000 });
   client.on('connect', () => { UI.mq = 'connected'; $('mqBtn').textContent = 'Disconnect'; $('mqStatus').innerHTML = '<span class="pass">Connected.</span> Subscribed to every topic in the table.'; Object.keys(TOPICS).filter(k => k !== 'control').forEach(k => client.subscribe(topicFor(k))); });
   client.on('error', e => { $('mqStatus').textContent = 'MQTT error: ' + e.message + '. Is Mosquitto listening for WebSockets on this port?'; });
-  client.on('close', () => { if (client) { UI.mq = 'retrying'; $('mqStatus').textContent = 'Connection closed — retrying…'; } });
+  client.on('close', () => { if (client) { UI.mq = 'retrying'; $('mqStatus').textContent = 'Connection closed — retrying…'; forgetLiveData(); } });
   client.on('message', (topic, buf) => { const k = Object.keys(TOPICS).find(x => topicMatch(topicFor(x), topic)); if (!k || k === 'control') return; const txt = buf.toString(); if (!txt) return; let m; try { m = JSON.parse(txt); } catch { UI.contract[k] = { ok: false, at: Date.now() }; return; } LogiEdge.push(k, m, topic); });
 }
 function mqttPublishControl(obj) { if (sim.s.dryRun) return; /* dry run: commands stay inside the simulation */ if (client && client.connected) client.publish(topicFor('control'), JSON.stringify({ ts: Date.now() / 1000, ...obj })); }
@@ -1591,7 +1594,10 @@ function renderHeader() { $('clock').textContent = fmtT(sim.s.t); $('play').text
     : conn + (live
       ? `Live data only — the edge pipeline shows only data from the Python services.${waiting.length ? ' No live data yet for: ' + waiting.join(', ') + '.' : ''}${UI.running ? '' : ' Press ▶ Run to process incoming data.'}`
       : ext ? 'External data is driving the edge node. Speed is locked to 1× so timestamps line up with your Python services.' : '');
-  $('extBanner').classList.toggle('show', dry || ext || live || !!conn); }
+  $('extBanner').classList.toggle('show', dry || ext || live || !!conn);
+  /* Live data arrives in real time from the Python services, so the speed control only applies to the mock (dry run). */
+  const locked = live || ext; $('speed').disabled = locked;
+  $('speed').title = locked ? 'Live data runs at 1× (real time). Tick "Mock data (dry run)" to use the speed control.' : 'Simulation speed of the built-in mock'; }
 function renderAll(force) {
   renderHeader(); renderMap(); renderStatus(); renderFlow();
   if (!UI.details) return;

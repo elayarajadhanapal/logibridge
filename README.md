@@ -22,11 +22,14 @@ The relevant project structure is:
 logibridge/
 ├── .venv/
 ├── data_pipeline/
-│   └── simulator.py
-├── monitor/
+│   ├── simulator.py
+│   ├── preprocessing.py
+│   ├── training_stats.npy
+│   └── data_pipeline_dashboard_iface.py
+├── dashboard/
+│   └── logiedge_dashboard.html
+├── monitoring/
 │   └── mqtt_monitor.py
-├── preprocessing/
-│   └── ...
 ├── requirements.txt
 └── README.md
 ```
@@ -285,7 +288,13 @@ It should point to:
 
 # 11. Start the LogiEdge Sensor Simulator
 
-The simulator publishes raw sensor data to the local MQTT broker.
+The simulator publishes sensor data to the local MQTT broker through
+`data_pipeline/data_pipeline_dashboard_iface.py` (topics and payloads in `docs/INTERFACES.md`),
+so the dashboard and `preprocessing.py` receive it directly.
+
+Options: `--anomaly`, `--truck-id`, `--broker-host`, `--broker-port`,
+`--duration` (seconds, `0` = until Ctrl+C, the default) and `--seed`.
+The anomaly mode can also be switched at runtime from the dashboard.
 
 The simulator supports:
 
@@ -305,7 +314,7 @@ localhost:1883
 The default truck ID is:
 
 ```text
-FB-042
+MH15-RF-0427
 ```
 
 ---
@@ -315,8 +324,8 @@ FB-042
 Run:
 
 ```bash
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly none \
     --duration 10
 ```
@@ -337,8 +346,8 @@ Vibration   ≈ 0.45g
 Run:
 
 ```bash
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly temp_drift \
     --duration 30
 ```
@@ -360,8 +369,8 @@ in the temperature-drift scenario.
 Run:
 
 ```bash
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly vibration \
     --duration 10
 ```
@@ -372,18 +381,8 @@ The vibration distribution changes to approximately:
 Mean ≈ 1.2g
 ```
 
-The vibration payload contains:
-
-```text
-500 samples/second
-3 axes
-```
-
-Therefore each one-second vibration message contains:
-
-```text
-500 × 3 = 1,500 values
-```
+Vibration is published as one compressor RMS value every 2 seconds (0.5 Hz).
+The raw 500 Hz × 3-axis signal is reduced to RMS on the sensor node and is not sent over MQTT.
 
 ---
 
@@ -392,8 +391,8 @@ Therefore each one-second vibration message contains:
 Run:
 
 ```bash
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly combined \
     --duration 30
 ```
@@ -407,9 +406,7 @@ This simulates both:
 
 # 12. Monitor MQTT Sensor Data
 
-The raw vibration payload is intentionally large because the simulator generates 500 Hz × 3-axis data.
-
-Instead of displaying all 1,500 values, use the MQTT monitor.
+Use the MQTT monitor to print the sensor messages in a readable form.
 
 Open another terminal:
 
@@ -421,7 +418,7 @@ source .venv/bin/activate
 Start the monitor:
 
 ```bash
-python monitor/mqtt_monitor.py
+python monitoring/mqtt_monitor.py
 ```
 
 You should see:
@@ -429,7 +426,7 @@ You should see:
 ```text
 Connecting to localhost:1883...
 Connected to MQTT broker: localhost:1883
-Subscribed to: logibridge/trucks/FB-042/sensors/#
+Subscribed to: logibridge/trucks/MH15-RF-0427/sensors/#
 ```
 
 ---
@@ -444,7 +441,7 @@ The recommended development setup uses two terminals.
 cd ~/workspace/mledge/logibridge
 source .venv/bin/activate
 
-python monitor/mqtt_monitor.py
+python monitoring/mqtt_monitor.py
 ```
 
 ### Terminal 2 — Simulator
@@ -453,34 +450,26 @@ python monitor/mqtt_monitor.py
 cd ~/workspace/mledge/logibridge
 source .venv/bin/activate
 
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly none \
     --duration 10
 ```
 
-The monitor displays a summary instead of printing the complete vibration payload.
+The monitor prints each sensor message as a short summary.
 
 Example:
 
 ```text
 Temperature
 -----------
-Truck       : FB-042
+Truck       : MH15-RF-0427
 Temperature : 3.872 °C
-Setpoint    : 4.0 °C
 
 Vibration
 ---------
-Truck       : FB-042
-Sample rate : 500 Hz
-Axes        : x, y, z
-Samples     : 500
-Shape       : (500, 3)
-Duration    : 1 sec
-Mean        : 0.450 g
-Min         : 0.261 g
-Max         : 0.639 g
+Truck       : MH15-RF-0427
+RMS         : 0.452 g
 ```
 
 ---
@@ -492,7 +481,7 @@ The simulator publishes data under the following topic hierarchy:
 ```text
 logibridge/
 └── trucks/
-    └── FB-042/
+    └── MH15-RF-0427/
         └── sensors/
             ├── temperature
             ├── vibration
@@ -502,15 +491,15 @@ logibridge/
 For example:
 
 ```text
-logibridge/trucks/FB-042/sensors/temperature
+logibridge/trucks/MH15-RF-0427/sensors/temperature
 ```
 
 ```text
-logibridge/trucks/FB-042/sensors/vibration
+logibridge/trucks/MH15-RF-0427/sensors/vibration
 ```
 
 ```text
-logibridge/trucks/FB-042/sensors/door
+logibridge/trucks/MH15-RF-0427/sensors/door
 ```
 
 The truck ID can be changed using:
@@ -522,8 +511,8 @@ The truck ID can be changed using:
 For example:
 
 ```bash
-python simulator/sensor_simulator.py \
-    --truck-id FB-001 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0001 \
     --anomaly none \
     --duration 10
 ```
@@ -554,7 +543,7 @@ sudo systemctl start mosquitto
 cd ~/workspace/mledge/logibridge
 source .venv/bin/activate
 
-python monitor/mqtt_monitor.py
+python monitoring/mqtt_monitor.py
 ```
 
 ### Terminal 3 — Run Simulator
@@ -563,8 +552,8 @@ python monitor/mqtt_monitor.py
 cd ~/workspace/mledge/logibridge
 source .venv/bin/activate
 
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly none \
     --duration 10
 ```
@@ -576,8 +565,8 @@ python simulator/sensor_simulator.py \
 ### Normal
 
 ```bash
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly none \
     --duration 10
 ```
@@ -585,8 +574,8 @@ python simulator/sensor_simulator.py \
 ### Temperature Drift
 
 ```bash
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly temp_drift \
     --duration 30
 ```
@@ -594,8 +583,8 @@ python simulator/sensor_simulator.py \
 ### Vibration
 
 ```bash
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly vibration \
     --duration 10
 ```
@@ -603,8 +592,8 @@ python simulator/sensor_simulator.py \
 ### Combined
 
 ```bash
-python simulator/sensor_simulator.py \
-    --truck-id FB-042 \
+python data_pipeline/simulator.py \
+    --truck-id MH15-RF-0427 \
     --anomaly combined \
     --duration 30
 ```
@@ -775,25 +764,10 @@ __pycache__/
 
 Mosquitto is a system service and should not be added to `requirements.txt`.
 
-### Raw vibration data
+### Vibration data
 
-The large vibration MQTT payload is intentional.
-
-The simulator produces:
-
-```text
-500 Hz × 3 axes
-```
-
-and therefore sends:
-
-```text
-500 × 3 = 1,500 values
-```
-
-for every one-second vibration batch.
-
-The monitor summarizes this data for easier debugging without changing the raw data received by the preprocessing pipeline.
+Vibration is published as one RMS value every 2 seconds (Task C1: `vibration_rms` at 0.5 Hz).
+The raw 500 Hz × 3-axis signal stays on the sensor node.
 
 ---
 
@@ -805,16 +779,21 @@ Implemented:
 - Python dependency management
 - Mosquitto MQTT broker
 - MQTT connectivity test
-- Raw temperature simulator
-- Raw 3-axis vibration simulator
-- Door event simulator
-- Four anomaly modes
+- Temperature simulator (1 Hz)
+- Vibration RMS simulator (0.5 Hz)
+- Door OPEN / CLOSE event simulator
+- Four anomaly modes, switchable at runtime from the dashboard
 - MQTT monitor
+- Preprocessing: 5-sample moving average, 30 s window / 10 s step, 6 features,
+  normalisation with `training_stats.npy`, published on `features`
 
-Next development step:
+Preprocessing modes:
 
-```text
-MQTT → Preprocessing → 30-second sliding window → 6 features
+```bash
+python data_pipeline/preprocessing.py                     # live: normalise and publish features (default)
+python data_pipeline/preprocessing.py --stats-shift 3     # live, stats mean shifted by 3 sigma (C2 experiment)
+python data_pipeline/preprocessing.py --mode normal       # 10 min of Normal data -> training_stats.npy
+python data_pipeline/preprocessing.py --mode temp_drift   # 10 min -> dataset_temp_drift.npy
 ```
 
-The preprocessing stage will consume the raw MQTT data and produce the six features required by the LogiEdge ML pipeline.
+`python run.py` starts the broker, preprocessing, the simulator and the dashboard together.

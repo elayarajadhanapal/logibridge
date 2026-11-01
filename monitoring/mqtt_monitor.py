@@ -1,12 +1,12 @@
 import json
+import os
 
-import numpy as np
 import paho.mqtt.client as mqtt
 
 
-BROKER_HOST = "localhost"
-BROKER_PORT = 1883
-TRUCK_ID = "FB-042"
+BROKER_HOST = os.environ.get("LOGIBRIDGE_MQTT_HOST", "localhost")
+BROKER_PORT = int(os.environ.get("LOGIBRIDGE_MQTT_PORT", "1883"))
+TRUCK_ID = "MH15-RF-0427"
 
 TOPIC = f"logibridge/trucks/{TRUCK_ID}/sensors/#"
 
@@ -29,31 +29,21 @@ def on_message(client, userdata, msg):
         print("Temperature")
         print("-----------")
         print(f"Truck       : {payload['truck_id']}")
-        print(f"Temperature : {payload['temperature_c']:.3f} °C")
-        print(f"Setpoint    : {payload['setpoint_c']:.1f} °C")
+        print(f"Temperature : {payload['value']:.3f} °C")
         print()
 
     elif msg.topic.endswith("/vibration"):
-        samples = np.array(payload["samples"])
-
         print("Vibration")
         print("---------")
         print(f"Truck       : {payload['truck_id']}")
-        print(f"Sample rate : {payload['sample_rate_hz']} Hz")
-        print(f"Axes        : {', '.join(payload['axes'])}")
-        print(f"Samples     : {samples.shape[0]}")
-        print(f"Shape       : {samples.shape}")
-        print(f"Duration    : {payload['duration_seconds']} sec")
-        print(f"Mean        : {samples.mean():.3f} g")
-        print(f"Min         : {samples.min():.3f} g")
-        print(f"Max         : {samples.max():.3f} g")
+        print(f"RMS         : {payload['value']:.3f} g")
         print()
 
     elif msg.topic.endswith("/door"):
         print("Door Event")
         print("----------")
         print(f"Truck : {payload['truck_id']}")
-        print(f"Event : {payload['event']}")
+        print(f"Event : {payload['state']}")
         print()
 
 
