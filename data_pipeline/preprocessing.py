@@ -25,7 +25,12 @@ def process_sliding_window(temp_array, vib_array):
 
     temp_mean = np.mean(temp_filtered)
     temp_std = np.std(temp_filtered)
-    temp_roc = (temp_filtered[-1] - temp_filtered[0]) * 2
+    if len(temp_filtered) > 1:
+        elapsed_seconds = len(temp_filtered) - 1
+        temp_roc = ((temp_filtered[-1] - temp_filtered[0]) * 60.0 / elapsed_seconds)  # rate of change per 2 seconds
+    else:
+        temp_roc = 0.0
+    # 30 temperature readings at 1 Hz span 29 seconds between the first and last readings. Multiplying the difference by 60 / 29 calculates the rate in °C/min.
 
     vib_rms = np.sqrt(np.mean(vib_filtered**2))
     vib_peak = np.max(np.abs(vib_filtered))
