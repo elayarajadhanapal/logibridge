@@ -1,0 +1,5 @@
+
+numpy
+paho-mqtt
+tensorflow
+tflite-runtime

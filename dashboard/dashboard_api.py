@@ -115,7 +115,7 @@ STREAMS = {
                       required={"value": _number}),
     "door": dict(topic="sensors/door", qos=1, retain=False,
                  required={"state": _one_of("OPEN", "CLOSE")}),
-    "features": dict(topic="features", qos=0, retain=False,
+    "features": dict(topic="features", qos=1, retain=False,
                      required={"window_start": _number, "raw": _numbers(6)},
                      optional={"norm": _numbers(6)}),
     "inference": dict(topic="inference", qos=1, retain=False,

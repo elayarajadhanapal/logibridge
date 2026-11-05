@@ -1,14 +1,15 @@
+from pathlib import Path
+
 import numpy as np
 
-data = np.load("data_pipeline/training_stats.npy")
+dataset_path = Path(__file__).resolve().with_name("dataset.npz")
 
-X = data["X"]
-y = data["y"]
+with np.load(dataset_path) as data:
+    X = data["X"]
+    y = data["y"]
 
 print("Features:", X.shape)
 print("Labels:", y.shape)
-
-print("Class distribution:")
-print("Normal:", np.sum(y == 0))
-print("Warning:", np.sum(y == 1))
-print("Critical:", np.sum(y == 2))
+print("Classes:", np.unique(y, return_counts=True))
+print("NaN:", np.isnan(X).any())
+print("Inf:", np.isinf(X).any())

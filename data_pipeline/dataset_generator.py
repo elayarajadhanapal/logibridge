@@ -1,6 +1,6 @@
-
 import argparse
 import json
+import os
 import signal
 import subprocess
 import sys
@@ -34,7 +34,7 @@ FEATURE_NAMES = [
 ]
 
 SCENARIOS = [
-    {
+   {
         "mode": "none",
         "label": 0,
         "duration": 1200,
@@ -265,6 +265,11 @@ def start_preprocessing():
     process = subprocess.Popen(
         command,
         cwd=PROJECT_ROOT,
+        creationflags=(
+            subprocess.CREATE_NEW_PROCESS_GROUP
+            if os.name == "nt"
+            else 0
+        ),
     )
 
     time.sleep(STARTUP_DELAY_SECONDS)
@@ -292,9 +297,12 @@ def stop_process(process, name):
 
     print(f"\nStopping {name}...")
 
-    process.send_signal(signal.SIGINT)
-
     try:
+
+        if os.name == "nt":
+            process.send_signal(signal.CTRL_BREAK_EVENT)
+        else:
+            process.send_signal(signal.SIGINT)
 
         process.wait(timeout=10)
 
@@ -304,6 +312,15 @@ def stop_process(process, name):
 
         process.kill()
         process.wait()
+
+    except OSError as exc:
+
+        print(
+            f"Could not stop {name} gracefully: {exc}"
+        )
+
+        process.terminate()
+        process.wait(timeout=10)
 
     print(f"{name} stopped.")
 
@@ -329,6 +346,11 @@ def run_simulator(truck_id, anomaly, duration):
     process = subprocess.Popen(
         command,
         cwd=PROJECT_ROOT,
+        creationflags=(
+            subprocess.CREATE_NEW_PROCESS_GROUP
+            if os.name == "nt"
+            else 0
+        ),
     )
 
     return process
@@ -372,10 +394,17 @@ def collect_scenario(collector, scenario, truck_id):
             duration=duration,
         )
 
-        simulator_process.wait()
+        return_code = simulator_process.wait()
+
+        if return_code != 0:
+
+            raise RuntimeError(
+                f"Simulator failed for {name}. "
+                f"Exit code: {return_code}"
+            )
 
         print(
-            f"\nSimulator completed: {name}"
+            f"\nSimulator completed successfully: {name}"
         )
 
         # Allow preprocessing to emit its final feature window.
@@ -556,5 +585,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()
