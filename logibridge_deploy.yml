@@ -1,0 +1,67 @@
+---
+- name: Deploy LogiBridge inference service
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Create deployment directory
+      ansible.builtin.file:
+        path: /opt/logibridge
+        state: directory
+        mode: '0755'
+
+    - name: Copy updated model
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/model.tflite"
+        dest: /opt/logibridge/model.tflite
+        mode: '0644'
+      register: model_copy
+
+    - name: Copy updated reference distribution
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/data_pipeline/reference_dist.json"
+        dest: /opt/logibridge/reference_dist.json
+        mode: '0644'
+      register: reference_copy
+
+    - name: Stop running inference container if deployment files changed
+      ansible.builtin.shell: |
+        running_state=$(docker inspect --format='{{ "{{" }}.State.Running{{ "}}" }}' logibridge-inference 2>/dev/null || true)
+        if [ "$running_state" = "true" ]; then
+          docker stop logibridge-inference
+        else
+          echo "Container absent or already stopped"
+        fi
+      register: stop_result
+      changed_when: "'logibridge-inference' in stop_result.stdout"
+      when: model_copy.changed or reference_copy.changed
+
+    - name: Pull updated inference image from local registry
+      community.docker.docker_image:
+        name: localhost:5000/logibridge-inference
+        tag: m1
+        source: pull
+
+    - name: Start inference container
+      community.docker.docker_container:
+        name: logibridge-inference
+        image: localhost:5000/logibridge-inference:m1
+        state: started
+        restart_policy: unless-stopped
+        env:
+          MODEL_PATH: /app/model.tflite
+          MODEL_DIR: /app/models
+          TRAINING_STATS_PATH: /app/training_stats.npy
+          TRUCK_ID: MH15-RF-0427
+          MODEL_NAME: M1
+          LOGIBRIDGE_MQTT_HOST: host.docker.internal
+          LOGIBRIDGE_MQTT_PORT: "1883"
+        volumes:
+          - /opt/logibridge/model.tflite:/app/model.tflite:ro
+
+    - name: Wait 15 seconds and verify container is running
+      ansible.builtin.shell: |
+        sleep 15
+        docker inspect --format='{{ "{{" }}.State.Running{{ "}}" }}' logibridge-inference | grep -qx true
+      changed_when: false
